@@ -1,0 +1,6 @@
+E:\SteamLibrary\steamapps\common\RimWorld\Mods\Celestia Race\Assemblies\CelesFeature.dll
+E:\SteamLibrary\steamapps\common\RimWorld\Mods\Celestia Race\Assemblies\CelesFeature.pdb
+D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.csproj.AssemblyReference.cache
+D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.csproj.CoreCompileInputs.cache
+D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.dll
+D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.pdb

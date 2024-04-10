@@ -1,0 +1,5 @@
+D:\Steam\steamapps\common\RimWorld\Mods\Celestia Race\Assemblies\CelesFeature.dll
+C:\Users\96987\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.AssemblyReference.cache
+C:\Users\96987\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CoreCompileInputs.cache
+C:\Users\96987\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFea.7D6530DF.Up2Date
+C:\Users\96987\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.dll

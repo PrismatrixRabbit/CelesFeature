@@ -184,9 +184,9 @@ namespace CelesFeature
 				instigator, -10, -5f, null, projectile: def, weapon: weaponDef);
 		}
 
-		public override void Draw()
+		public void Draw()
 		{
-			base.Draw();
+			Comps_PostDraw();
 			if (!projectiles.NullOrEmpty())
 			{
 				for (int i = 0; i < projectiles.Count; i++)
@@ -211,7 +211,7 @@ namespace CelesFeature
 				}
 			}
 
-			FireUtility.TryStartFireIn(intVec, base.Map, Rand.Range(0.1f, 0.925f));
+			FireUtility.TryStartFireIn(intVec, base.Map, Rand.Range(0.1f, 0.925f),instigator);
 		}
 
 		private void GetNextExplosionCell()
@@ -260,7 +260,7 @@ namespace CelesFeature
 
 		private bool drawInterceptCone;
 
-		private bool debugInterceptNonHostileProjectiles;
+		internal bool debugInterceptNonHostileProjectiles;
 		
 		public bool BombardmentCanStartFireAt(CelesArtilleryStrike bombardment, IntVec3 cell)
 		{

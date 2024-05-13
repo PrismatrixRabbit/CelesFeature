@@ -4,3 +4,7 @@ D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.csproj.AssemblyRefe
 D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.csproj.CoreCompileInputs.cache
 D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.dll
 D:\RIMMOD\CelesFeature\CelesFeature\obj\Release\CelesFeature.pdb
+D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.csproj.AssemblyReference.cache
+D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.csproj.CoreCompileInputs.cache
+D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.dll
+D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.pdb

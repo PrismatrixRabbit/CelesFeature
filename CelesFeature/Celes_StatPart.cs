@@ -101,9 +101,15 @@ namespace CelesFeature
 		{
 			if (t != null && t is Pawn pawn)
 			{
-				float num = PawnCapacityUtility.CalculateTagEfficiency(pawn.health.hediffSet, BodyPartTagDefOf.HearingSource);
-				factor = num;
-				return true;
+				if (pawn.kindDef.race.defName == "Celes_Race")
+				{
+					float num = PawnCapacityUtility.CalculateTagEfficiency(pawn.health.hediffSet,
+						BodyPartTagDefOf.HearingSource);
+					factor = num;
+					return true;
+				}
+				factor = 0f;
+				return false;
 			}
 			factor = 0f;
 			return false;

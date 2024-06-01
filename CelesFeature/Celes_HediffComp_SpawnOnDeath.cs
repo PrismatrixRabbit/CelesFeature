@@ -9,17 +9,20 @@ namespace CelesFeature
 
         public override void Notify_PawnKilled()
         {
+            base.Pawn.equipment.DestroyAllEquipment();
+            base.Pawn.apparel.DestroyAll();
+             for (int i = 0; i < Props.spawnCount; i++)
+             {
+                 GenSpawn.Spawn(Props.spawnThing,base.Pawn.Position,base.Pawn.Map);
+             }
+             if (Props.spawnPawn)
+             {
+                 GenSpawn.Spawn(Props.spawnPawnDef,base.Pawn.Position,base.Pawn.Map);
+             }
+        }
+        public override void Notify_PawnDied(DamageInfo? dinfo, Hediff culprit=null)
+        {
             base.Pawn.Corpse.Destroy();
-            base.Pawn.apparel.DropAll(base.Pawn.Position);
-            base.Pawn.equipment.DropAllEquipment(base.Pawn.Position);
-            for (int i = 0; i < Props.spawnCount; i++)
-            {
-                GenSpawn.Spawn(Props.spawnThing,base.Pawn.Position,base.Pawn.Map);
-            }
-            if (Props.spawnPawn)
-            {
-                GenSpawn.Spawn(Props.spawnPawnDef,base.Pawn.Position,base.Pawn.Map);
-            }
         }
     }
 }

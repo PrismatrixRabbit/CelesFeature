@@ -21,8 +21,8 @@ namespace CelesFeature
                 return goodwill <= g.Key.TrueMax && goodwill >= g.Key.TrueMin;
             }) is KeyValuePair<IntRange,string> greet)
             {
-                DiaNode aidNode = GetAidNode(__result, negotiator, goodwill, greet,faction);
-                DiaOption aid = new DiaOption("Celes_Aid".Translate()) { link = aidNode };
+                DiaNode aidNode = GetMainNode(__result, negotiator, goodwill, greet,faction);
+                DiaOption aid = new DiaOption("Celes_Main".Translate()) { link = aidNode };
                 aid.Disable(null);
                 DiaOption disconnect = __result.options.Last();
                 __result.options.Remove(disconnect);
@@ -30,20 +30,22 @@ namespace CelesFeature
                 __result.options.Add(disconnect);
             }
         }
-        private static DiaNode GetAidNode(DiaNode __result, Pawn negotiator, int goodwill, KeyValuePair<IntRange, string> greet,Faction f)
+        private static DiaNode GetMainNode(DiaNode __result, Pawn negotiator, int goodwill, KeyValuePair<IntRange, string> greet,Faction f)
         {
-            DiaNode aidNode = new DiaNode(greet.Value.Translate(goodwill, GetSilverCount(negotiator.Map)));  
+            DiaNode mainNode = new DiaNode(greet.Value.Translate(goodwill, GetSilverCount(negotiator.Map)));  
             GameComponent_Celes comp = Current.Game.GetComponent<GameComponent_Celes>();
+            DiaNode aid = new DiaNode("Celes_AidGreet".Translate());
+            DiaNode drop = new DiaNode("Celes_DropGreet".Translate());
             DefDatabase<AidOptionDef>.AllDefsListForReading.ForEach(o =>
             {
                 DiaOption option = new DiaOption(o.label);
                 if ((!o.requests.NullOrEmpty() && !CheckRequiredThings(o.requests, negotiator.Map)))
                 {
-                    option.Disable("Cekes_LackRequests".Translate());
+                    option.Disable("Celes_LackRequests".Translate());
                 }
                 if (!comp.AidAvailable(o, out float time))
                 {
-                    option.Disable("Cekes_InCooldown".Translate(((int)time).ToStringTicksToDays()));
+                    option.Disable("Celes_InCooldown".Translate(((int)time).ToStringTicksToDays()));
                 }
                 option.resolveTree = true;
                 option.action = () =>
@@ -52,14 +54,25 @@ namespace CelesFeature
                     o.effects.ForEach(e => e.Work(negotiator.Map));
                     comp.AddCooldown(o);
                 };
-                aidNode.options.Add(option);
+                if (!o.isDrop)
+                {
+                    aid.options.Add(option);
+                }
+                else 
+                {
+                    drop.options.Add(option);
+                }
             });
+            aid.options.Add(new DiaOption("GoBack".Translate()) { link = mainNode });
+            drop.options.Add(new DiaOption("GoBack".Translate()) { link = mainNode });
+            mainNode.options.Add(new DiaOption("Celes_Aid".Translate()) { link = aid });
+            mainNode.options.Add(new DiaOption("Celes_Drop".Translate()) { link = drop });
             DiaNode tradeNode = new DiaNode("Celes_TradeGreet".Translate());
-            aidNode.options.Add(new DiaOption("Celes_Trade".Translate()) {link = tradeNode});
+            mainNode.options.Add(new DiaOption("Celes_Trade".Translate()) {link = tradeNode});
             comp.TradeOptions.ForEach(o => tradeNode.options.Add(o.GetOption(negotiator.Map,comp,f)));
-            tradeNode.options.Add(new DiaOption("GoBack".Translate()) { link = aidNode });
-            aidNode.options.Add(new DiaOption("GoBack".Translate()) { link = __result });
-            return aidNode;
+            tradeNode.options.Add(new DiaOption("GoBack".Translate()) { link = mainNode });
+            mainNode.options.Add(new DiaOption("GoBack".Translate()) { link = __result });
+            return mainNode;
         }
 
         public static int GetSilverCount(Map map) 

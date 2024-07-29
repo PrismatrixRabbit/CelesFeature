@@ -12,6 +12,7 @@ namespace CelesFeature
 {
     public class AidOptionDef : Def
     {
+        public bool isDrop;
         public int cooldown = 100;
         public List<ThingDefCountClass> requests = new List<ThingDefCountClass>();
         public List<AidEffect> effects = new List<AidEffect>();

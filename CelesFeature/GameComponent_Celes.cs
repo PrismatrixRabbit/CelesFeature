@@ -40,7 +40,6 @@ namespace CelesFeature
                        }
                        if (!d.rewards.NullOrEmpty())
                        {
-                           Log.Message("aa");
                            d.rewards.ForEach(r => result.rewards.Add(new ThingDefCountClass(r.thingDef, r.countRange.RandomInRange)));
                        }
                        return result;
@@ -120,12 +119,12 @@ namespace CelesFeature
             DiaOption result = new DiaOption(TranslatorFormattedStringExtensions.Translate(this.def.label, requestString, rewardString));
             if ((!this.requests.NullOrEmpty() && !Patch_Faction.CheckRequiredThings(this.requests, map)))
             {
-                result.Disable("Cekes_LackRequests".Translate());
+                result.Disable("Celes_LackRequests".Translate());
             }
             if (comp.lastTradeTime != 0 && Find.TickManager.TicksGame - comp.lastTradeTime < 7 * 60000)
             {
                 int time = (int)((7 * 60000 - (Find.TickManager.TicksGame - comp.lastTradeTime)));
-                result.Disable("Cekes_InCooldown".Translate(time.ToStringTicksToDays()));
+                result.Disable("Celes_InCooldown".Translate(time.ToStringTicksToDays()));
             }
             result.resolveTree = true;
             result.action = () =>

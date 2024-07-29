@@ -22,9 +22,11 @@ namespace CelesFeature
             }) is KeyValuePair<IntRange,string> greet)
             {
                 DiaNode aidNode = GetAidNode(__result, negotiator, goodwill, greet,faction);
+                DiaOption aid = new DiaOption("Celes_Aid".Translate()) { link = aidNode };
+                aid.Disable(null);
                 DiaOption disconnect = __result.options.Last();
                 __result.options.Remove(disconnect);
-                __result.options.Add(new DiaOption("Celes_Aid".Translate()) { link = aidNode });
+                __result.options.Add(aid);
                 __result.options.Add(disconnect);
             }
         }

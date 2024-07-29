@@ -39,6 +39,7 @@
     <ItemGroup>
         <Reference Include="0Harmony">
           <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\0Harmony.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="Assembly-CSharp">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
@@ -46,22 +47,28 @@
         </Reference>
         <Reference Include="Assembly-CSharp-firstpass">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="com.rlabrecque.steamworks.net">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="HarmonyMod">
           <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\HarmonyMod.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="ISharpZipLib">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\ISharpZipLib.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="Microsoft.CSharp" />
         <Reference Include="Mono.Posix">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Posix.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="Mono.Security">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Security.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="System" />
         <Reference Include="System.Core" />
@@ -71,6 +78,7 @@
         <Reference Include="System.Xml" />
         <Reference Include="System.Xml.Linq">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\System.Xml.Linq.dll</HintPath>
+          <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine">
           <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.dll</HintPath>

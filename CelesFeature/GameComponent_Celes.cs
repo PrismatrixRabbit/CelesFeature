@@ -18,6 +18,7 @@ namespace CelesFeature
             {
                 if (!this.tradeOptions.Any() || Find.TickManager.TicksGame - this.lastUpdateTradeTime > 7 * 60000) 
                 {
+                    this.tradeOptions.Clear();
                     List<TradeOptionDef> goodwill = new List<TradeOptionDef>();
                     List<TradeOptionDef> small = new List<TradeOptionDef>();
                     List<TradeOptionDef> big = new List<TradeOptionDef>();
@@ -60,7 +61,7 @@ namespace CelesFeature
         public bool AidAvailable(AidOptionDef def,out float time) 
         {
             AidCooldown cool = this.cooldown.Find(c => c.def == def);
-            time = cool == null ? 0 : cool.cooldown / 60000f;
+            time = cool == null ? 0 : cool.cooldown;
             return cool == null;
         }
         public override void GameComponentTick()
@@ -124,7 +125,6 @@ namespace CelesFeature
             if (comp.lastTradeTime != 0 && Find.TickManager.TicksGame - comp.lastTradeTime < 7 * 60000)
             {
                 int time = (int)((7 * 60000 - (Find.TickManager.TicksGame - comp.lastTradeTime)));
-                Log.Message(time);
                 result.Disable("Cekes_InCooldown".Translate(time.ToStringTicksToDays()));
             }
             result.resolveTree = true;

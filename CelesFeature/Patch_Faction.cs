@@ -21,8 +21,8 @@ namespace CelesFeature
                 return goodwill <= g.Key.TrueMax && goodwill >= g.Key.TrueMin;
             }) is KeyValuePair<IntRange,string> greet)
             {
-                DiaNode aidNode = GetMainNode(__result, negotiator, goodwill, greet,faction);
-                DiaOption aid = new DiaOption("Celes_Main".Translate()) { link = aidNode };
+                DiaNode mainNode = GetMainNode(__result, negotiator, goodwill, greet,faction);
+                DiaOption aid = new DiaOption("Celes_Main".Translate()) { link = mainNode };
                 aid.Disable(null);
                 DiaOption disconnect = __result.options.Last();
                 __result.options.Remove(disconnect);

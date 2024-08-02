@@ -8,4 +8,3 @@ D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.csproj.Asse
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.csproj.CoreCompileInputs.cache
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.dll
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.pdb
-D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Release\CelesFeature.csproj.CopyComplete

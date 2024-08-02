@@ -109,6 +109,7 @@
         <Compile Include="Celes_HediffComp_Spawner.cs" />
         <Compile Include="Celes_HediffComp_SpawnOnDeath.cs" />
         <Compile Include="Celes_HediffDefOf.cs" />
+        <Compile Include="Celes_Recipe_Surgery.cs" />
         <Compile Include="Celes_StatPart.cs" />
         <Compile Include="CompUseEffect_CallReinforcement.cs" />
         <Compile Include="GameComponent_Celes.cs" />

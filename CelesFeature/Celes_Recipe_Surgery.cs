@@ -23,4 +23,44 @@ namespace CelesFeature
             return false;
         }
     }
+    
+    public class Celes_Recipe_Surgery_NoForCeles:Celes_Recipe_AddHediff
+    {
+        public override bool AvailableOnNow(Thing thing, BodyPartRecord part = null)
+        {
+            if (!base.AvailableOnNow(thing, part))
+            {
+                return false;
+            }
+            if (!(thing is Pawn pawn))
+            {
+                return false;
+            }
+            if (pawn.kindDef.race.defName == "Celes_Race")
+            {
+                return false;
+            }
+            return false;
+        }
+    }
+    
+    public class Celes_Recipe_Surgery_ForCeles:Celes_Recipe_AddHediff
+    {
+        public override bool AvailableOnNow(Thing thing, BodyPartRecord part = null)
+        {
+            if (!base.AvailableOnNow(thing, part))
+            {
+                return false;
+            }
+            if (!(thing is Pawn pawn))
+            {
+                return false;
+            }
+            if (!(pawn.kindDef.race.defName == "Celes_Race"))
+            {
+                return false;
+            }
+            return false;
+        }
+    }
 }

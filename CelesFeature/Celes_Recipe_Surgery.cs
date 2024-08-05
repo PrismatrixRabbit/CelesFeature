@@ -24,7 +24,7 @@ namespace CelesFeature
         }
     }
     
-    public class Celes_Recipe_Surgery_NoForCeles:Celes_Recipe_AddHediff
+    public class Celes_Recipe_Surgery_NotForCeles:Celes_Recipe_AddHediff
     {
         public override bool AvailableOnNow(Thing thing, BodyPartRecord part = null)
         {

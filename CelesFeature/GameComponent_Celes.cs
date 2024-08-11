@@ -22,6 +22,7 @@ namespace CelesFeature
                     List<TradeOptionDef> goodwill = new List<TradeOptionDef>();
                     List<TradeOptionDef> small = new List<TradeOptionDef>();
                     List<TradeOptionDef> big = new List<TradeOptionDef>();
+                    List<TradeOptionDef> back = new List<TradeOptionDef>();
                     DefDatabase<TradeOptionDef>.AllDefsListForReading.ForEach(d => 
                     {
                         switch (d.tradeType) 
@@ -29,6 +30,7 @@ namespace CelesFeature
                             case TradeType.GoodWill:goodwill.Add(d);break;
                             case TradeType.Small: small.Add(d); break;
                             case TradeType.Big: big.Add(d); break;
+                            case TradeType.Back: back.Add(d); break;
                         }
                     });
                     Func<TradeOptionDef, TradeOption> getOption = (d) =>
@@ -48,6 +50,7 @@ namespace CelesFeature
                     this.tradeOptions.Add(getOption(goodwill.RandomElement()));
                     this.tradeOptions.Add(getOption(small.RandomElement()));
                     this.tradeOptions.Add(getOption(big.RandomElement()));
+                    this.tradeOptions.Add(getOption(back.RandomElement()));
                     this.lastUpdateTradeTime = Find.TickManager.TicksGame;
                 }
                 return this.tradeOptions;

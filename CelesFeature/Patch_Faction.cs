@@ -35,7 +35,7 @@ namespace CelesFeature
         }
         private static DiaNode GetMainNode(DiaNode __result, Pawn negotiator, int goodwill, KeyValuePair<IntRange, string> greet,Faction f)
         {
-            DiaNode mainNode = new DiaNode(greet.Value.Translate(goodwill, GetSilverCount(negotiator.Map)));  
+            DiaNode mainNode = new DiaNode(greet.Value.Translate(goodwill, GetKeyCount(negotiator.Map)));  
             GameComponent_Celes comp = Current.Game.GetComponent<GameComponent_Celes>();
             DiaNode aid = new DiaNode("Celes_AidGreet".Translate());
             DiaNode drop = new DiaNode("Celes_DropGreet".Translate());
@@ -78,9 +78,9 @@ namespace CelesFeature
             return mainNode;
         }
 
-        public static int GetSilverCount(Map map) 
+        public static int GetKeyCount(Map map) 
         {
-            return map.listerThings.ThingsOfDef(ThingDefOf.Silver).FindAll(s => s.Spawned && s.Position.GetZone(map) is Zone_Stockpile).Sum(s => s.stackCount);
+            return map.listerThings.ThingsOfDef(Celes_ThingDefOf.CelesKeyCard).FindAll(s => s.Spawned && s.Position.GetZone(map) is Zone_Stockpile).Sum(s => s.stackCount);
         }
         public static bool CheckRequiredThings(List<ThingDefCountClass> requiredThings,Map map)
         {

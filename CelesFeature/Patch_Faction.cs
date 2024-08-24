@@ -103,8 +103,17 @@ namespace CelesFeature
             {
                 if (counts.ContainsKey(t.def) && counts[t.def] >= 1)
                 {
-                    int count = t.stackCount;
-                    t.SplitOff(counts[t.def]).Destroy();
+                    int count = t.stackCount;   
+                    
+                    if (counts[t.def] > t.stackCount)
+                    {
+                        t.SplitOff(counts[t.def]).Destroy();
+                    }
+                    else 
+                    {
+                        t.Destroy();
+                    }
+
                     counts[t.def] -= t.stackCount;
                 }
             }

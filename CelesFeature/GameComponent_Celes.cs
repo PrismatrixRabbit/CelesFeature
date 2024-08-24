@@ -16,7 +16,7 @@ namespace CelesFeature
         {
             get 
             {
-                if (!this.tradeOptions.Any() || Find.TickManager.TicksGame - this.lastUpdateTradeTime > 7 * 60000) 
+                if (!this.tradeOptions.Any() || Find.TickManager.TicksGame - this.lastUpdateTradeTime > 2 * 60000) 
                 {
                     this.tradeOptions.Clear();
                     List<TradeOptionDef> goodwill = new List<TradeOptionDef>();

@@ -16,7 +16,7 @@ namespace CelesFeature
         {
             get 
             {
-                if (!this.tradeOptions.Any() || Find.TickManager.TicksGame - this.lastUpdateTradeTime > 2 * 60000) 
+                if (!this.tradeOptions.Any() || Find.TickManager.TicksGame - this.lastUpdateTradeTime > 1 * 60000) 
                 {
                     this.tradeOptions.Clear();
                     List<TradeOptionDef> goodwill = new List<TradeOptionDef>();
@@ -124,9 +124,9 @@ namespace CelesFeature
             {
                 result.Disable("Celes_LackRequests".Translate());
             }
-            if (comp.lastTradeTime != 0 && Find.TickManager.TicksGame - comp.lastTradeTime < 2 * 60000)
+            if (comp.lastTradeTime != 0 && Find.TickManager.TicksGame - comp.lastTradeTime < 1 * 60000)
             {
-                int time = (int)((2 * 60000 - (Find.TickManager.TicksGame - comp.lastTradeTime)));
+                int time = (int)((1 * 60000 - (Find.TickManager.TicksGame - comp.lastTradeTime)));
                 result.Disable("Celes_InCooldown".Translate(time.ToStringTicksToDays()));
             }
             result.resolveTree = true;

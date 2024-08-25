@@ -99,13 +99,13 @@ namespace CelesFeature
         {
             Dictionary<ThingDef, int> counts = new Dictionary<ThingDef, int>();
             requiredThings.ForEach(d => counts.Add(d.thingDef, d.count));
-            foreach (Thing t in map.listerThings.GetAllThings(t => t.Spawned && t.Position.GetZone(map) is Zone_Stockpile))
+            foreach (Thing t in map.listerThings.GetAllThings(t => t.Spawned && t.Position.GetZone(map) is Zone_Stockpile).ToList().ListFullCopy())
             {
                 if (counts.ContainsKey(t.def) && counts[t.def] >= 1)
                 {
                     int count = t.stackCount;   
                     
-                    if (counts[t.def] > t.stackCount)
+                    if (t.stackCount > counts[t.def])
                     {
                         t.SplitOff(counts[t.def]).Destroy();
                     }
@@ -114,7 +114,7 @@ namespace CelesFeature
                         t.Destroy();
                     }
 
-                    counts[t.def] -= t.stackCount;
+                    counts[t.def] -= count;
                 }
             }
         }

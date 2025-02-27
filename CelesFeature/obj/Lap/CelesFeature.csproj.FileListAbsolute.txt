@@ -7,3 +7,7 @@ D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Lap\CelesFeature.csproj.Assembly
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CoreCompileInputs.cache
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Lap\CelesFeature.dll
 D:\RimworldMod\CelestiaFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CopyComplete
+D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.AssemblyReference.cache
+D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CoreCompileInputs.cache
+D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFea.7D6530DF.Up2Date
+D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.dll

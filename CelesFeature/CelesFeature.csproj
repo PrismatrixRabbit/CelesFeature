@@ -38,37 +38,29 @@
     </PropertyGroup>
     <ItemGroup>
         <Reference Include="0Harmony">
-          <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\0Harmony.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\0Harmony.dll</HintPath>
         </Reference>
         <Reference Include="Assembly-CSharp">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
         </Reference>
         <Reference Include="Assembly-CSharp-firstpass">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
         </Reference>
         <Reference Include="com.rlabrecque.steamworks.net">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
         </Reference>
         <Reference Include="HarmonyMod">
-          <HintPath>E:\SteamLibrary\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\HarmonyMod.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\workshop\content\294100\2009463077\1.4\Assemblies\HarmonyMod.dll</HintPath>
         </Reference>
         <Reference Include="ISharpZipLib">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\ISharpZipLib.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\ISharpZipLib.dll</HintPath>
         </Reference>
         <Reference Include="Microsoft.CSharp" />
         <Reference Include="Mono.Posix">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Posix.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Posix.dll</HintPath>
         </Reference>
         <Reference Include="Mono.Security">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Security.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Mono.Security.dll</HintPath>
         </Reference>
         <Reference Include="System" />
         <Reference Include="System.Core" />
@@ -81,26 +73,24 @@
           <Private>False</Private>
         </Reference>
         <Reference Include="UnityEngine">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.IMGUIModule">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.TextRenderingModule">
-          <HintPath>E:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
-          <Private>False</Private>
+          <HintPath>..\..\..\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
         </Reference>
     </ItemGroup>
     <ItemGroup>
         <Compile Include="AidOptionDef.cs" />
         <Compile Include="CelesArtilleryStrike.cs" />
         <Compile Include="CelesRadiationBullet.cs" />
+        <Compile Include="Celes_ExtraDamage.cs" />
+        <Compile Include="Celes_DamageDefOf.cs" />
         <Compile Include="Celes_HediffCompProperties_Jumper.cs" />
         <Compile Include="Celes_HediffCompProperties_Spawner.cs" />
         <Compile Include="Celes_HediffCompProperties_SpawnOnDeath.cs" />
@@ -109,8 +99,10 @@
         <Compile Include="Celes_HediffComp_Spawner.cs" />
         <Compile Include="Celes_HediffComp_SpawnOnDeath.cs" />
         <Compile Include="Celes_HediffDefOf.cs" />
+        <Compile Include="Celes_Recipe_AddHediff.cs" />
         <Compile Include="Celes_Recipe_Surgery.cs" />
         <Compile Include="Celes_StatPart.cs" />
+        <Compile Include="Celes_ThingDefOf.cs" />
         <Compile Include="CompUseEffect_CallReinforcement.cs" />
         <Compile Include="GameComponent_Celes.cs" />
         <Compile Include="ModExtension_Aid.cs" />

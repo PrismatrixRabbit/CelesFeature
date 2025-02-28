@@ -15,17 +15,18 @@ namespace CelesFeature
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_Particle)
             {
-                DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-                NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.5f);
+                DamageInfo newDamageInfo=new DamageInfo(damageInfo);
+                newDamageInfo.SetAmount(damageInfo.Amount*0.5f);
+				newDamageInfo.SetHitPart(damageInfo.HitPart);
                 ApplyToPawn(damageInfo, pawn);
-                return ApplyToPawn(NewDamageInfo, pawn);
+                return ApplyToPawn(newDamageInfo, pawn);
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_MassiveParticle)
             {
-	            DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-	            NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.7f);
+	            DamageInfo newDamageInfo=new DamageInfo(damageInfo);
+	            newDamageInfo.SetAmount(newDamageInfo.Amount*0.7f);
 	            ApplyToPawn(damageInfo, pawn);
-	            return ApplyToPawn(NewDamageInfo, pawn);
+	            return ApplyToPawn(newDamageInfo, pawn);
             }
             return ApplyToPawn(damageInfo, pawn);
         }

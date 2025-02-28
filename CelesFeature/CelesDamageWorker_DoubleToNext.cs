@@ -17,6 +17,7 @@ namespace CelesFeature
             {
                 DamageInfo newDamageInfo=new DamageInfo(damageInfo);
                 newDamageInfo.SetAmount(damageInfo.Amount*0.5f);
+                newDamageInfo.Def = Celes_DamageDefOf.Burn;
 				newDamageInfo.SetHitPart(damageInfo.HitPart);
                 ApplyToPawn(damageInfo, pawn);
                 return ApplyToPawn(newDamageInfo, pawn);
@@ -25,6 +26,8 @@ namespace CelesFeature
             {
 	            DamageInfo newDamageInfo=new DamageInfo(damageInfo);
 	            newDamageInfo.SetAmount(newDamageInfo.Amount*0.7f);
+	            newDamageInfo.Def = Celes_DamageDefOf.Burn;
+	            newDamageInfo.SetHitPart(damageInfo.HitPart);
 	            ApplyToPawn(damageInfo, pawn);
 	            return ApplyToPawn(newDamageInfo, pawn);
             }

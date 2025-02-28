@@ -5,7 +5,7 @@ using Verse;
 
 namespace CelesFeature
 {
-    public class Celes_ExtraDamage:DamageWorker_AddInjury
+    public class CelesDamageWorker_DoubleToNext:DamageWorker_AddInjury
     {
         public override DamageResult Apply(DamageInfo damageInfo, Thing thing)
         {

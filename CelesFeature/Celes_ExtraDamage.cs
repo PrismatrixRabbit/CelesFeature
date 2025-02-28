@@ -11,22 +11,21 @@ namespace CelesFeature
         {
             if(!(thing is Pawn pawn))
             {
-	            //ToDo 调用祖父类方法待定
-                return base.Apply(damageInfo, thing);   
+                return base.Apply(damageInfo, thing);
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_Particle)
             {
-				//ToDo 填写倍率
                 DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-                NewDamageInfo.SetAmount(NewDamageInfo.Amount*2f);
-                ApplyToPawn(NewDamageInfo, pawn);
+                NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.5f);
+                ApplyToPawn(damageInfo, pawn);
+                return ApplyToPawn(NewDamageInfo, pawn);
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_MassiveParticle)
             {
-	            //ToDo 填写倍率
 	            DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-	            NewDamageInfo.SetAmount(NewDamageInfo.Amount*3f);
-	            ApplyToPawn(NewDamageInfo, pawn);
+	            NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.7f);
+	            ApplyToPawn(damageInfo, pawn);
+	            return ApplyToPawn(NewDamageInfo, pawn);
             }
             return ApplyToPawn(damageInfo, pawn);
         }

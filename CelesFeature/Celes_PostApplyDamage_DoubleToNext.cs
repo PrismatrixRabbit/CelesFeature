@@ -17,9 +17,21 @@ namespace CelesFeature
             Harmony.DEBUG = true;
             FileLog.Reset();
             FileLog.Log("初始化段");
-            if(__instance==null || __instance.Dead)return;
-            if(dinfo.Def!=Celes_DamageDefOf.Celes_Particle && dinfo.Def!=Celes_DamageDefOf.Celes_MassiveParticle)return;
-            if(dinfo.HitPart==null)return;
+            if(__instance==null || __instance.Dead)
+            {
+                FileLog.Log("人死或不存在");
+                return;
+            }
+            if(dinfo.Def!=Celes_DamageDefOf.Celes_Particle && dinfo.Def!=Celes_DamageDefOf.Celes_MassiveParticle)
+            {
+                FileLog.Log("非星铃伤害类型");
+                return;
+            }
+            if(dinfo.HitPart==null)
+            {
+                FileLog.Log("部件无效");
+                return;
+            }
             if (dinfo.Def.GetModExtension<Celes_DamageExtension_Multiplier>()
                 is Celes_DamageExtension_Multiplier ext)
             {

@@ -13,9 +13,9 @@ namespace CelesFeature
         private static readonly string appliedDamageFlag = "ExtraDamageApplied";
 
         [HarmonyPostfix]
-        public static void ApplyExtraDamage(DamageInfo dinfo, Thing target, DamageWorker __instance)
+        public static void ApplyExtraDamage(DamageInfo dinfo, Thing victim, DamageWorker __instance)
         {
-            if (target is not Pawn pawn || dinfo.Amount <= 0 || (dinfo.Def != Celes_DamageDefOf.Celes_Particle &&
+            if (victim is not Pawn pawn || dinfo.Amount <= 0 || (dinfo.Def != Celes_DamageDefOf.Celes_Particle &&
                 dinfo.Def != Celes_DamageDefOf.Celes_MassiveParticle))
             {
                 return;

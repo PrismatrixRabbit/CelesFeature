@@ -27,7 +27,7 @@ namespace CelesFeature
                 DamageInfo extraDamage = new DamageInfo(dinfo);
                 extraDamage.SetAmount(damageAmount);
                 extraDamage.Def = Celes_DamageDefOf.Burn;
-                pawn.health.PostApplyDamage(extraDamage,damageAmount);
+                pawn.TakeDamage(extraDamage);
             }
             
         }

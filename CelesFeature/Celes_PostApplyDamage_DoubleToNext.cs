@@ -12,7 +12,7 @@ namespace CelesFeature
     public static class Celes_PostApplyDamage_DoubleToNext
     {
         
-        public static void Postfix(Pawn __instance, DamageInfo dinfo, float totalDamageDealt)
+        public static void Postfix(Pawn __instance,ref DamageInfo dinfo,ref float totalDamageDealt)
         {
             Harmony.DEBUG = true;
             FileLog.Reset();
@@ -36,7 +36,7 @@ namespace CelesFeature
                 is Celes_DamageExtension_Multiplier ext)
             {
                 FileLog.Log("作用段");
-                float damageAmount = totalDamageDealt * ext.multiplier;
+                float damageAmount = dinfo.Amount * ext.multiplier;
                 DamageInfo extraDamage = new DamageInfo(dinfo);
                 extraDamage.SetAmount(damageAmount);
                 extraDamage.Def = Celes_DamageDefOf.Burn;

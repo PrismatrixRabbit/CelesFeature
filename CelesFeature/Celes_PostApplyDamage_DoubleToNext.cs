@@ -13,7 +13,7 @@ namespace CelesFeature
         private static readonly string appliedDamageFlag = "ExtraDamageApplied";
 
         [HarmonyPostfix]
-        public static void ApplyExtraDamage(DamageInfo dinfo, Thing target, DamageWorker __instance, DamageWorker.DamageResult __result)
+        public static void ApplyExtraDamage(DamageInfo dinfo, Thing target, DamageWorker __instance)
         {
             if (target is not Pawn pawn || dinfo.Amount <= 0 || (dinfo.Def != Celes_DamageDefOf.Celes_Particle &&
                 dinfo.Def != Celes_DamageDefOf.Celes_MassiveParticle))
@@ -30,6 +30,16 @@ namespace CelesFeature
                 newDinfo.Def = Celes_DamageDefOf.Burn;
                 pawn.TakeDamage(newDinfo);
             }
+        }
+    }
+    public class CelesFeature : Mod
+    {
+        public static Harmony harmony;
+
+        public CelesFeature(ModContentPack content) : base(content)
+        {
+            harmony = new Harmony("team.acs.celestiarace");
+            harmony.PatchAll();
         }
     }
 }

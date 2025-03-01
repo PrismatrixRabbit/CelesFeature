@@ -29,7 +29,9 @@ namespace CelesFeature
                 newDinfo.SetAmount(extraDamage);
                 newDinfo.Def = Celes_DamageDefOf.Burn;
                 pawn.TakeDamage(newDinfo);
+                Log.Message("1");
             }
+            
         }
     }
     public class CelesFeature : Mod

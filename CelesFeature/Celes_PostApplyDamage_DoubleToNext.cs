@@ -23,10 +23,11 @@ namespace CelesFeature
             if (dinfo.Def.GetModExtension<Celes_DamageExtension_Multiplier>()
                 is Celes_DamageExtension_Multiplier ext)
             {
+                float damageAmount = totalDamageDealt * ext.multiplier;
                 DamageInfo extraDamage = new DamageInfo(dinfo);
-                extraDamage.SetAmount(totalDamageDealt * ext.multiplier);
+                extraDamage.SetAmount(damageAmount);
                 extraDamage.Def = Celes_DamageDefOf.Burn;
-                pawn.TakeDamage(extraDamage);
+                pawn.health.PostApplyDamage(extraDamage,damageAmount);
             }
             
         }

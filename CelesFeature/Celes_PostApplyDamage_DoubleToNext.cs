@@ -8,16 +8,17 @@ namespace CelesFeature
     {
         public float multiplier = 0.5f; 
     }
-    [HarmonyPatch(typeof(Pawn), nameof(Pawn.PostApplyDamage))]
+    [HarmonyPatch(typeof(Pawn_HealthTracker), nameof(Pawn_HealthTracker.PostApplyDamage))]
     public static class Celes_PostApplyDamage_DoubleToNext
     {
-        
-        public static void Postfix(Pawn __instance,ref DamageInfo dinfo,ref float totalDamageDealt)
+        private static readonly FieldInfo PawnField = AccessTools.Field(typeof(Pawn_HealthTracker), "pawn");
+        public static void Postfix(Pawn_HealthTracker __instance,ref DamageInfo dinfo,ref float totalDamageDealt)
         {
+            Pawn pawn=PawnField.GetValue(__instance) as Pawn;
             Harmony.DEBUG = true;
             FileLog.Reset();
             FileLog.Log("初始化段");
-            if(__instance==null || __instance.Dead)
+            if(pawn==null || pawn.Dead)
             {
                 FileLog.Log("人死或不存在");
                 return;
@@ -40,7 +41,7 @@ namespace CelesFeature
                 DamageInfo extraDamage = new DamageInfo(dinfo);
                 extraDamage.SetAmount(damageAmount);
                 extraDamage.Def = Celes_DamageDefOf.Burn;
-                __instance.TakeDamage(extraDamage);
+                pawn.TakeDamage(extraDamage);
             }
             
         }

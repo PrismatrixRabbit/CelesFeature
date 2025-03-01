@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using HarmonyLib;
 using RimWorld;
@@ -8,13 +9,18 @@ namespace CelesFeature
     {
         public float multiplier = 0.5f; 
     }
-    [HarmonyPatch(typeof(Pawn_HealthTracker), nameof(Pawn_HealthTracker.PostApplyDamage))]
-    public static class Celes_PostApplyDamage_DoubleToNext
+    [HarmonyPatch]
+    public static class Celes_DamageWorker_DoubleToNext
     {
-        private static readonly FieldInfo PawnField = AccessTools.Field(typeof(Pawn_HealthTracker), "pawn");
-        public static void Postfix(Pawn_HealthTracker __instance,ref DamageInfo dinfo,ref float totalDamageDealt)
+        static MethodBase TargetMethod()
         {
-            Pawn pawn=PawnField.GetValue(__instance) as Pawn;
+            Type targetType = AccessTools.TypeByName("Verse.DamageWorker_AddInjury");
+            return AccessTools.Method(targetType, "FinalizeAndAddInjury", new[] { typeof(Pawn)
+                , typeof(Hediff_Injury),typeof(DamageInfo),typeof(DamageWorker.DamageResult) });
+        }
+        [HarmonyPostfix]
+        public static void Postfix(Pawn pawn, Hediff_Injury injury, DamageInfo dinfo, DamageWorker.DamageResult result)
+        {
             Harmony.DEBUG = true;
             FileLog.Reset();
             FileLog.Log("初始化段");
@@ -28,7 +34,7 @@ namespace CelesFeature
                 FileLog.Log("非星铃伤害类型");
                 return;
             }
-            if(dinfo.HitPart==null)
+            if(injury.Part==null)
             {
                 FileLog.Log("部件无效");
                 return;
@@ -40,6 +46,7 @@ namespace CelesFeature
                 float damageAmount = dinfo.Amount * ext.multiplier;
                 DamageInfo extraDamage = new DamageInfo(dinfo);
                 extraDamage.SetAmount(damageAmount);
+                extraDamage.SetHitPart(injury.Part);
                 extraDamage.Def = Celes_DamageDefOf.Burn;
                 pawn.TakeDamage(extraDamage);
             }

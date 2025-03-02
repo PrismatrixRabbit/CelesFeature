@@ -12,6 +12,7 @@
         <AssemblyName>CelesFeature</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
+        <LangVersion>12</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -89,8 +90,8 @@
         <Compile Include="AidOptionDef.cs" />
         <Compile Include="CelesArtilleryStrike.cs" />
         <Compile Include="CelesRadiationBullet.cs" />
-        <Compile Include="Celes_ExtraDamage.cs" />
         <Compile Include="Celes_DamageDefOf.cs" />
+        <Compile Include="Celes_DamageWorker_DoubleToNext.cs" />
         <Compile Include="Celes_HediffCompProperties_Jumper.cs" />
         <Compile Include="Celes_HediffCompProperties_Spawner.cs" />
         <Compile Include="Celes_HediffCompProperties_SpawnOnDeath.cs" />

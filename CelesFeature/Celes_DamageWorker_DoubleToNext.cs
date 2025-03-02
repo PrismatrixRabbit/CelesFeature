@@ -22,27 +22,21 @@ namespace CelesFeature
         public static void Postfix(Pawn pawn, Hediff_Injury injury, DamageInfo dinfo, DamageWorker.DamageResult result)
         {
             Harmony.DEBUG = true;
-            FileLog.Reset();
-            FileLog.Log("初始化段");
             if(pawn==null || pawn.Dead)
             {
-                FileLog.Log("人死或不存在");
                 return;
             }
-            if(dinfo.Def!=Celes_DamageDefOf.Celes_Particle && dinfo.Def!=Celes_DamageDefOf.Celes_MassiveParticle)
+            if(dinfo.Def!=Celes_DamageDefOf.Celes_Particle && dinfo.Def!=Celes_DamageDefOf.Celes_MassiveParticle && dinfo.Def!=Celes_DamageDefOf.Celes_BulletRadiation)
             {
-                FileLog.Log("非星铃伤害类型");
                 return;
             }
             if(injury.Part==null)
             {
-                FileLog.Log("部件无效");
                 return;
             }
             if (dinfo.Def.GetModExtension<Celes_DamageExtension_Multiplier>()
                 is Celes_DamageExtension_Multiplier ext)
             {
-                FileLog.Log("作用段");
                 float damageAmount = dinfo.Amount * ext.multiplier;
                 DamageInfo extraDamage = new DamageInfo(dinfo);
                 extraDamage.SetAmount(damageAmount);

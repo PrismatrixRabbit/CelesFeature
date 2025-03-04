@@ -10,28 +10,56 @@ namespace CelesFeature
         public float rand;
         public override void CompPostTick(ref float severityAdjustment)
         {
-            if(!Props.minToJump)
+            if (Props.useRace && Pawn.kindDef == Props.specialRace)
             {
-                rand = Rand.Range(0f, 1f);
-                if(rand<=Props.chanceToJump)
+                if (!Props.minToJump)
                 {
-                    if (this.parent.Severity == this.parent.def.maxSeverity)
-                    {
-                        Pawn.health.RemoveHediff(parent);
-                        Pawn.health.AddHediff(Props.targetHediff);
-                    }
+                    MinToJump(Props.hediffForSpRace);
+                }
+                else if (Props.minToJump)
+                {
+                    MaxToJump(Props.hediffForSpRace);
+                }
+                else if (Props.specialRace == null)
+                {
+                    Log.Error("你特殊种族忘记写啦");
                 }
             }
-            else if (Props.minToJump)
+            else
             {
-                rand = Rand.Range(0f, 1f);
-                if(rand<=Props.chanceToJump)
+                if (!Props.minToJump)
                 {
-                    if (this.parent.Severity == this.parent.def.minSeverity)
-                    {
-                        Pawn.health.RemoveHediff(parent);
-                        Pawn.health.AddHediff(Props.targetHediff);
-                    }
+                    MinToJump(Props.targetHediff);
+                }
+                else if (Props.minToJump)
+                {
+                    MaxToJump(Props.targetHediff);
+                }
+            }
+        }
+
+        public void MinToJump(HediffDef TargetHediff)
+        {
+            rand = Rand.Range(0f, 1f);
+            if (rand <= Props.chanceToJump)
+            {
+                if (this.parent.Severity == this.parent.def.maxSeverity)
+                {
+                    Pawn.health.RemoveHediff(parent);
+                    Pawn.health.AddHediff(TargetHediff);
+                }
+            }
+        }
+
+        public void MaxToJump(HediffDef TargetHediff)
+        {
+            rand = Rand.Range(0f, 1f);
+            if (rand <= Props.chanceToJump)
+            {
+                if (this.parent.Severity == this.parent.def.minSeverity)
+                {
+                    Pawn.health.RemoveHediff(parent);
+                    Pawn.health.AddHediff(TargetHediff);
                 }
             }
         }

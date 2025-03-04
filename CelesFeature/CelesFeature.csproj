@@ -89,7 +89,7 @@
         <Compile Include="AidOptionDef.cs" />
         <Compile Include="CelesArtilleryStrike.cs" />
         <Compile Include="CelesRadiationBullet.cs" />
-        <Compile Include="Celes_ExtraDamage.cs" />
+        <Compile Include="CelesDamageWorker_DoubleToNext.cs" />
         <Compile Include="Celes_DamageDefOf.cs" />
         <Compile Include="Celes_HediffCompProperties_Jumper.cs" />
         <Compile Include="Celes_HediffCompProperties_Spawner.cs" />

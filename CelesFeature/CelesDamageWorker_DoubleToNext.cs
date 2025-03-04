@@ -7,6 +7,7 @@ namespace CelesFeature
 {
     public class CelesDamageWorker_DoubleToNext:DamageWorker_AddInjury
     {
+	    public static BodyPartRecord abcdefghijklmnopqrstuvwxyz = null;
         public override DamageResult Apply(DamageInfo damageInfo, Thing thing)
         {
             if(!(thing is Pawn pawn))
@@ -15,17 +16,21 @@ namespace CelesFeature
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_Particle)
             {
-                DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-                NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.5f);
+                DamageInfo newDamageInfo=new DamageInfo(damageInfo);
+                newDamageInfo.SetAmount(damageInfo.Amount*0.5f);
+                newDamageInfo.Def = Celes_DamageDefOf.Burn;
+				newDamageInfo.SetHitPart(abcdefghijklmnopqrstuvwxyz);
                 ApplyToPawn(damageInfo, pawn);
-                return ApplyToPawn(NewDamageInfo, pawn);
+                return ApplyToPawn(newDamageInfo, pawn);
             }
             if (damageInfo.Def == Celes_DamageDefOf.Celes_MassiveParticle)
             {
-	            DamageInfo NewDamageInfo=new DamageInfo(damageInfo);
-	            NewDamageInfo.SetAmount(NewDamageInfo.Amount*0.7f);
+	            DamageInfo newDamageInfo=new DamageInfo(damageInfo);
+	            newDamageInfo.SetAmount(newDamageInfo.Amount*0.7f);
+	            newDamageInfo.Def = Celes_DamageDefOf.Burn;
+	            newDamageInfo.SetHitPart(abcdefghijklmnopqrstuvwxyz);
 	            ApplyToPawn(damageInfo, pawn);
-	            return ApplyToPawn(NewDamageInfo, pawn);
+	            return ApplyToPawn(newDamageInfo, pawn);
             }
             return ApplyToPawn(damageInfo, pawn);
         }
@@ -196,6 +201,7 @@ namespace CelesFeature
 			return dinfo.HitPart;
 		}
 		BodyPartRecord bodyPartRecord = ChooseHitPart(dinfo, pawn);
+		abcdefghijklmnopqrstuvwxyz=bodyPartRecord;
 		if (bodyPartRecord == null)
 		{
 			Log.Warning("ChooseHitPart returned null (any part).");

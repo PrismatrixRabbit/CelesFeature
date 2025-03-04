@@ -17,5 +17,6 @@ namespace CelesFeature
         public static HediffDef Celes_NanoImplanted_II;
         public static HediffDef Celes_NanoImplanted_III;
         public static HediffDef Celes_NanoImplanted_IV;
+        public static HediffDef CelesSleepMechlinkImplant;
     }
 }

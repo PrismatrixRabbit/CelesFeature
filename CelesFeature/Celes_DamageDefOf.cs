@@ -8,5 +8,7 @@ namespace CelesFeature
     {
         public static DamageDef Celes_Particle;
         public static DamageDef Celes_MassiveParticle;
+        public static DamageDef Celes_BulletRadiation;
+        public static DamageDef Burn;
     }
 }

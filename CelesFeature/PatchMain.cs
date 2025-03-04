@@ -16,6 +16,7 @@ namespace CelesFeature
 		{
 			Harmony harmony = new Harmony("Celes_Patch");
 			harmony.PatchAll(Assembly.GetExecutingAssembly());
+			
 		}
 	}
 }

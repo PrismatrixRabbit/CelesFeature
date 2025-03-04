@@ -11,3 +11,7 @@ D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.AssemblyR
 D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CoreCompileInputs.cache
 D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFea.7D6530DF.Up2Date
 D:\RimModProject\CelesFeature\CelesFeature\obj\Lap\CelesFeature.dll
+C:\Users\AlopexL\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.AssemblyReference.cache
+C:\Users\AlopexL\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.csproj.CoreCompileInputs.cache
+C:\Users\AlopexL\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFea.7D6530DF.Up2Date
+C:\Users\AlopexL\RiderProjects\CelesFeature\CelesFeature\obj\Lap\CelesFeature.dll

@@ -38,7 +38,7 @@ namespace CelesFeature
             }
         }
 
-        public void MinToJump(HediffDef TargetHediff)
+        private void MinToJump(HediffDef targetHediff)
         {
             rand = Rand.Range(0f, 1f);
             if (rand <= Props.chanceToJump)
@@ -46,12 +46,12 @@ namespace CelesFeature
                 if (this.parent.Severity == this.parent.def.maxSeverity)
                 {
                     Pawn.health.RemoveHediff(parent);
-                    Pawn.health.AddHediff(TargetHediff);
+                    Pawn.health.AddHediff(targetHediff);
                 }
             }
         }
 
-        public void MaxToJump(HediffDef TargetHediff)
+        private void MaxToJump(HediffDef targetHediff)
         {
             rand = Rand.Range(0f, 1f);
             if (rand <= Props.chanceToJump)
@@ -59,7 +59,7 @@ namespace CelesFeature
                 if (this.parent.Severity == this.parent.def.minSeverity)
                 {
                     Pawn.health.RemoveHediff(parent);
-                    Pawn.health.AddHediff(TargetHediff);
+                    Pawn.health.AddHediff(targetHediff);
                 }
             }
         }

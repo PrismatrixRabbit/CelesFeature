@@ -28,10 +28,10 @@ namespace CelesFeature
         {
             float capacityLevel = Pawn.health.capacities.GetLevel(Props.CapacityToCheck);
         
-            if (capacityLevel < Props.SeverityToCheck && !Pawn.health.hediffSet.HasHediff(Props.targetHediff))
+            if (capacityLevel < Props.SeverityToCheck && !Pawn.health.hediffSet.HasHediff(Props.targetHediff) && Pawn.health.summaryHealth.SummaryHealthPercent<=Props.HPCheck)
             {
-                Pawn.health.RemoveHediff(parent);
                 Pawn.health.AddHediff(Props.targetHediff);
+                Pawn.health.RemoveHediff(parent);
             }
         }
 

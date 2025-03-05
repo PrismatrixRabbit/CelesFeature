@@ -9,6 +9,7 @@ namespace CelesFeature
         public PawnCapacityDef CapacityToCheck;
         public float SeverityToCheck = 0.33f;
         public int CheckTick = 60;
+        public float HPCheck = 0.8f;
         
         public Celes_HediffCompProperties_CapacityCheck()
         {

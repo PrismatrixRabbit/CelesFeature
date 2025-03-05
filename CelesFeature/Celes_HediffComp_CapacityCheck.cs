@@ -30,9 +30,8 @@ namespace CelesFeature
         
             if (capacityLevel < Props.SeverityToCheck && !Pawn.health.hediffSet.HasHediff(Props.targetHediff))
             {
-                Hediff newHediff = HediffMaker.MakeHediff(Props.targetHediff, Pawn);
                 Pawn.health.RemoveHediff(parent);
-                Pawn.health.AddHediff(newHediff);
+                Pawn.health.AddHediff(Props.targetHediff);
             }
         }
 

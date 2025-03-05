@@ -8,7 +8,7 @@ namespace CelesFeature
             public float chanceToJump=1f;
             public bool minToJump=false;
             public bool useRace=false;
-            public PawnKindDef specialRace;
+            public ThingDef specialRace;
             public HediffDef hediffForSpRace;
             public Celes_HediffCompProperties_Jumper()
             {

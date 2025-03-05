@@ -30,8 +30,8 @@ namespace CelesFeature
         
             if (capacityLevel < Props.SeverityToCheck && !Pawn.health.hediffSet.HasHediff(Props.targetHediff) && Pawn.health.summaryHealth.SummaryHealthPercent<=Props.HPCheck)
             {
-                Pawn.health.AddHediff(Props.targetHediff);
                 Pawn.health.RemoveHediff(parent);
+                Pawn.health.AddHediff(Props.targetHediff);
             }
         }
 

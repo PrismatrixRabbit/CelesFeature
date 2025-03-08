@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using Verse;
 
@@ -6,8 +7,8 @@ namespace CelesFeature
 {
     public class Celes_RecipeModExtension : DefModExtension
     {
-        public List<HediffDef> listA;
-        public List<HediffDef> listB;
+        public List<HediffDef> AllowWhenHediff;
+        public List<HediffDef> DisallowWhenHediff;
         public bool useRace=false;
         public List<ThingDef> race=null;
         public bool addHediff;
@@ -43,31 +44,24 @@ namespace CelesFeature
             }
             
             Celes_RecipeModExtension ext = recipe.GetModExtension<Celes_RecipeModExtension>();
-            foreach (HediffDef def in ext.listB)
+            foreach (HediffDef def in ext.DisallowWhenHediff)
             {
                 if (pawn.health.hediffSet.HasHediff(def))
                 {
                     return false;
                 }
             }
-
-            foreach (HediffDef def in ext.listA)
+            foreach(HediffDef def in ext.AllowWhenHediff)
             {
-                if (!pawn.health.hediffSet.HasHediff(def))
+                if (!pawn.health.hediffSet.hediffs.Any((Hediff h) => h.def == def))
                 {
                     return false;
                 }
             }
-
-            if (ext.useRace)
+            
+            if (ext.useRace && (!ext.race?.Contains(pawn.def) ?? false))
             {
-                foreach (ThingDef def in ext.race)
-                {
-                    if (pawn.def != def)
-                    {
-                        return false;
-                    }
-                }
+                return false;
             }
             
             if (pawn.health.hediffSet.hediffs.Any((Hediff x) => !recipe.CompatibleWithHediff(x.def)))

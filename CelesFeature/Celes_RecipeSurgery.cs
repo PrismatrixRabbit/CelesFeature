@@ -24,6 +24,8 @@ namespace CelesFeature
         }
         public bool IsValidNow(Thing thing, BodyPartRecord part = null, bool ignoreBills = false)
         {
+            Celes_RecipeModExtension ext = recipe.GetModExtension<Celes_RecipeModExtension>();
+            if (ext.AllowWhenHediff == null || ext.DisallowWhenHediff == null) return false;
             if (!base.AvailableOnNow(thing, part))
             {
                 return false;
@@ -32,7 +34,6 @@ namespace CelesFeature
             {
                 return false;
             }
-
             if (!recipe.HasModExtension<Celes_RecipeModExtension>())
             {
                 return false;
@@ -43,7 +44,6 @@ namespace CelesFeature
                 return false;
             }
             
-            Celes_RecipeModExtension ext = recipe.GetModExtension<Celes_RecipeModExtension>();
             foreach (HediffDef def in ext.DisallowWhenHediff)
             {
                 if (pawn.health.hediffSet.HasHediff(def))

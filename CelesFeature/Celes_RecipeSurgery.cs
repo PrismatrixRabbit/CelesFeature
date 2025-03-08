@@ -31,10 +31,6 @@ namespace CelesFeature
             {
                 return false;
             }
-            if (part != null && (pawn.health.WouldDieAfterAddingHediff(recipe.addsHediff, part, 1f) || pawn.health.WouldLosePartAfterAddingHediff(recipe.addsHediff, part, 1f)))
-            {
-                return false;
-            }
 
             if (!recipe.HasModExtension<Celes_RecipeModExtension>())
             {

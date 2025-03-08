@@ -101,7 +101,7 @@ namespace CelesFeature
 		{
 			if (t != null && t is Pawn pawn)
 			{
-				if (pawn.kindDef.race.defName == "Celes_Race")
+				if (pawn.def == Celes_ThingDefOf.Celes_Race)
 				{
 					float num = PawnCapacityUtility.CalculateTagEfficiency(pawn.health.hediffSet,
 						BodyPartTagDefOf.HearingSource);

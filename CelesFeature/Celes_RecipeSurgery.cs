@@ -9,7 +9,7 @@ namespace CelesFeature
         public List<HediffDef> listA;
         public List<HediffDef> listB;
         public bool useRace=false;
-        public List<PawnKindDef> race=null;
+        public List<ThingDef> race=null;
         public bool addHediff;
         public bool removeHediff;
         public HediffDef hediffToAdd;
@@ -17,8 +17,6 @@ namespace CelesFeature
     }
     public class Celes_RecipeSurgery:Recipe_Surgery
     {
-        private bool TriggerA;
-        private bool TriggerB;
         public override bool AvailableOnNow(Thing thing, BodyPartRecord part=null)
         {
             return IsValidNow(thing, part);
@@ -67,9 +65,9 @@ namespace CelesFeature
 
             if (ext.useRace)
             {
-                foreach (PawnKindDef def in ext.race)
+                foreach (ThingDef def in ext.race)
                 {
-                    if (pawn.kindDef != def)
+                    if (pawn.def != def)
                     {
                         return false;
                     }

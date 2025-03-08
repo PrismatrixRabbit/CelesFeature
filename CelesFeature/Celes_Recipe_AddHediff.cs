@@ -41,7 +41,7 @@ namespace CelesFeature
             {
                 return false;
             }
-            if (pawn.kindDef.race.defName == "Celes_Race")
+            if (pawn.def == Celes_ThingDefOf.Celes_Race)
             {
                 return false;
             }

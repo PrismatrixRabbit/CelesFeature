@@ -21,22 +21,22 @@ namespace CelesFeature
             { 
                 if (Props.minToJump)
                 {
-                    MaxToJump(Props.hediffForSpRace);
+                    MinToJump(Props.hediffForSpRace);
                 }
                 else
                 {
-                    MinToJump(Props.hediffForSpRace);
+                    MaxToJump(Props.hediffForSpRace);
                 }
             }
             else
             {
                 if (Props.minToJump)
                 {
-                    MaxToJump(Props.targetHediff);
+                    MinToJump(Props.targetHediff);
                 }
                 else
                 {
-                    MinToJump(Props.targetHediff);
+                    MaxToJump(Props.targetHediff);
                 }
             }
         }

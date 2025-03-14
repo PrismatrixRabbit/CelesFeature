@@ -17,7 +17,7 @@ namespace CelesFeature
                 return;
             }
             
-            if (Props.useRace && Pawn.def == Props.specialRace)
+            if (Props.useRace && Props.specialRace != null && Props.specialRace.Contains(Pawn.def))
             { 
                 if (Props.minToJump)
                 {

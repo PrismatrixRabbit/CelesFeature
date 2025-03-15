@@ -55,7 +55,7 @@ namespace CelesFeature
             slate.Set<Faction>("permitFaction",Find.FactionManager.FirstFactionOfDef(this.faction), false);
             slate.Set<PawnKindDef>("laborersPawnKind", this.aidParameter.pawnKindDef, false);
             slate.Set<float>("laborersDurationDays", this.aidParameter.aidDurationDays, false);
-            slate.Set<IntVec3>("landingCell", DropCellFinder.TradeDropSpot(map), false);
+            slate.Set<IntVec3>("landingCell", DropCellFinder.GetBestShuttleLandingSpot(map, Find.FactionManager.FirstFactionOfDef(this.faction)), false);
             QuestUtility.GenerateQuestAndMakeAvailable(this.def, slate);
         }
 

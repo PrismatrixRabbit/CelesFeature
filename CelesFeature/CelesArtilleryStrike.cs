@@ -92,7 +92,7 @@ namespace CelesFeature
 		private static readonly Material ProjectileMaterial =
 			MaterialPool.MatFrom("Things/Projectile/Bullet_Big", ShaderDatabase.Transparent, Color.black);
 
-		public static readonly SimpleCurve DistanceChanceFactor = new SimpleCurve
+		public new static readonly SimpleCurve DistanceChanceFactor = new SimpleCurve
 		{
 			new CurvePoint(0f, 1f),
 			new CurvePoint(1f, 0.1f)

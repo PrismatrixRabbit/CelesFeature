@@ -73,7 +73,7 @@ namespace CelesFeature
 
 		public new int bombIntervalTicks = 10;
 
-		public new int warmupTicks = 20;
+		public new int warmupTicks = 60;
 
 		public new int explosionCount = 100;
 

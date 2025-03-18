@@ -9,7 +9,7 @@ using Verse.Sound;
 namespace CelesFeature
 {
 	[StaticConstructorOnStartup]
-	public class  CelesArtilleryStrike : OrbitalStrike
+	public class  CelesArtilleryStrike : Bombardment
 	{
 		public class  CelesArtilleryStrikeProjectile : IExposable
 		{
@@ -81,7 +81,7 @@ namespace CelesFeature
 
 		private IntVec3 nextExplosionCell = IntVec3.Invalid;
 
-		private List< CelesArtilleryStrikeProjectile> projectiles = new List< CelesArtilleryStrikeProjectile>();
+		private List<BombardmentProjectile> projectiles = new List<BombardmentProjectile>();
 
 		public const int EffectiveAreaRadius = 23;
 
@@ -152,7 +152,7 @@ namespace CelesFeature
 			if (ticksToNextEffect <= 0 && base.TicksLeft >= bombIntervalTicks)
 			{
 				SoundDefOf.Bombardment_PreImpact.PlayOneShot(new TargetInfo(nextExplosionCell, base.Map));
-				projectiles.Add(new CelesArtilleryStrikeProjectile(60, nextExplosionCell));
+				projectiles.Add(new BombardmentProjectile(60, nextExplosionCell));
 				ticksToNextEffect = bombIntervalTicks;
 				GetNextExplosionCell();
 			}
@@ -169,12 +169,12 @@ namespace CelesFeature
 		}
 		
 	
-		private void TryDoExplosion(CelesArtilleryStrikeProjectile proj)
+		private void TryDoExplosion(BombardmentProjectile proj)
 		{
 			List<Thing> list = base.Map.listerThings.ThingsInGroup(ThingRequestGroup.ProjectileInterceptor);
 			for (int i = 0; i < list.Count; i++)
 			{
-				if (list[i].TryGetComp<CelesCompProjectileInterceptor>().CheckBombardmentIntercept(this, proj))
+				if (list[i].TryGetComp<CompProjectileInterceptor>().CheckBombardmentIntercept(this, proj))
 				{
 					return;
 				}
@@ -205,7 +205,7 @@ namespace CelesFeature
 			List<Thing> list = base.Map.listerThings.ThingsInGroup(ThingRequestGroup.ProjectileInterceptor);
 			for (int i = 0; i < list.Count; i++)
 			{
-				if (!list[i].TryGetComp<CelesCompProjectileInterceptor>().BombardmentCanStartFireAt(this, intVec))
+				if (!list[i].TryGetComp<CompProjectileInterceptor>().BombardmentCanStartFireAt(this, intVec))
 				{
 					return;
 				}
@@ -242,70 +242,11 @@ namespace CelesFeature
 
 				if (projectiles == null)
 				{
-					projectiles = new List<CelesArtilleryStrikeProjectile>();
+					projectiles = new List<BombardmentProjectile>();
 				}
 			}
 		}
 		
-	}
-	public class CelesCompProjectileInterceptor : CompProjectileInterceptor
-	{
-		private int lastInterceptTicks = -999999;
-		
-		public new int currentHitPoints = -1;
-
-		public new int? maxHitPointsOverride;
-
-		private float lastInterceptAngle;
-
-		private bool drawInterceptCone;
-
-		internal bool debugInterceptNonHostileProjectiles;
-		
-		public bool BombardmentCanStartFireAt(CelesArtilleryStrike bombardment, IntVec3 cell)
-		{
-			if (!Active || !Props.interceptAirProjectiles)
-			{
-				return true;
-			}
-			if ((bombardment.instigator == null || !bombardment.instigator.HostileTo(parent)) && !debugInterceptNonHostileProjectiles && !Props.interceptNonHostileProjectiles)
-			{
-				return true;
-			}
-			return !cell.InHorDistOf(parent.Position, Props.radius);
-		}
-		private void TriggerEffecter(IntVec3 pos)
-		{
-			Effecter effecter = new Effecter(Props.interceptEffect ?? EffecterDefOf.Interceptor_BlockedProjectile);
-			effecter.Trigger(new TargetInfo(pos, parent.Map), TargetInfo.Invalid);
-			effecter.Cleanup();
-		}
-
-		
-		public bool CheckBombardmentIntercept(CelesArtilleryStrike bombardment,
-			CelesArtilleryStrike.CelesArtilleryStrikeProjectile projectile)
-		{
-			if (!Active || !Props.interceptAirProjectiles)
-			{
-				return false;
-			}
-
-			if (!projectile.targetCell.InHorDistOf(parent.Position, Props.radius))
-			{
-				return false;
-			}
-
-			if ((bombardment.instigator == null || !bombardment.instigator.HostileTo(parent)) &&
-			    !debugInterceptNonHostileProjectiles && !Props.interceptNonHostileProjectiles)
-			{
-				return false;
-			}
-
-			lastInterceptTicks = Find.TickManager.TicksGame;
-			drawInterceptCone = false;
-			TriggerEffecter(projectile.targetCell);
-			return true;
-		}
 	}
 
 	public class Verb_ArtilleryStrike : Verb_CastBase

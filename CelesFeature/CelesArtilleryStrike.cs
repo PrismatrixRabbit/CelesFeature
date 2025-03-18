@@ -65,17 +65,17 @@ namespace CelesFeature
 			}
 		}
 
-		public float impactAreaRadius = 15f;
+		public new float impactAreaRadius = 15f;
 
-		public FloatRange explosionRadiusRange = new FloatRange(4f, 6f);
+		public new FloatRange explosionRadiusRange = new FloatRange(4f, 6f);
 
-		public int randomFireRadius = 10;
+		public new int randomFireRadius = 10;
 
-		public int bombIntervalTicks = 10;
+		public new int bombIntervalTicks = 10;
 
-		public int warmupTicks = 20;
+		public new int warmupTicks = 20;
 
-		public int explosionCount = 100;
+		public new int explosionCount = 100;
 
 		private int ticksToNextEffect;
 
@@ -83,7 +83,7 @@ namespace CelesFeature
 
 		private List<BombardmentProjectile> projectiles = new List<BombardmentProjectile>();
 
-		public const int EffectiveAreaRadius = 23;
+		public  new const int EffectiveAreaRadius = 23;
 
 		private const int StartRandomFireEveryTicks = 20;
 

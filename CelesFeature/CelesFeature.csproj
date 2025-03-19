@@ -87,6 +87,8 @@
         <Compile Include="CelesArtilleryStrike.cs" />
         <Compile Include="CelesRadiationBullet.cs" />
         <Compile Include="Celes_BolterGun.cs" />
+        <Compile Include="Celes_CompProperties_MutiFunctionalShield.cs" />
+        <Compile Include="Celes_Comp_MutiFunctionalShield.cs" />
         <Compile Include="Celes_DamageDefOf.cs" />
         <Compile Include="Celes_DamageWorker_DoubleToNext.cs" />
         <Compile Include="Celes_HediffCompProperties_CapacityCheck.cs" />
@@ -99,9 +101,8 @@
         <Compile Include="Celes_HediffComp_Spawner.cs" />
         <Compile Include="Celes_HediffComp_SpawnOnDeath.cs" />
         <Compile Include="Celes_HediffDefOf.cs" />
+        <Compile Include="Celes_RecipeInstallImplant.cs" />
         <Compile Include="Celes_RecipeSurgery.cs" />
-        <Compile Include="Celes_Recipe_AddHediff.cs" />
-        <Compile Include="Celes_Recipe_Surgery.cs" />
         <Compile Include="Celes_StatPart.cs" />
         <Compile Include="Celes_ThingDefOf.cs" />
         <Compile Include="CompUseEffect_CallReinforcement.cs" />

@@ -14,8 +14,9 @@ namespace CelesFeature
         public bool removeHediff;
         public HediffDef hediffToAdd;
         public HediffDef hediffToRemove;
+        public HediffDef PrerequisiteHediff;
     }
-    public class Celes_RecipeSurgery:Recipe_Surgery
+    public class Celes_RecipeSurgery : Recipe_Surgery
     {
         public override bool AvailableOnNow(Thing thing, BodyPartRecord part=null)
         {

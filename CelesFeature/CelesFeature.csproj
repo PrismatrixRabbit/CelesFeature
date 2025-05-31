@@ -12,6 +12,7 @@
         <AssemblyName>CelesFeature</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
+        <LangVersion>11</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -93,17 +94,18 @@
         <Compile Include="Celes_DamageWorker_DoubleToNext.cs" />
         <Compile Include="Celes_HediffCompProperties_CapacityCheck.cs" />
         <Compile Include="Celes_HediffCompProperties_Jumper.cs" />
-        <Compile Include="Celes_HediffCompProperties_Spawner.cs" />
+        <Compile Include="Celes_CompProperties_Spawner.cs" />
         <Compile Include="Celes_HediffCompProperties_SpawnOnDeath.cs" />
         <Compile Include="Celes_HediffComp_CapacityCheck.cs" />
         <Compile Include="Celes_HediffComp_Jumper.cs" />
         <Compile Include="Celes_HediffComp_RemoveHediffOnDeath.cs" />
-        <Compile Include="Celes_HediffComp_Spawner.cs" />
+        <Compile Include="Celes_CompSpawner.cs" />
         <Compile Include="Celes_HediffComp_SpawnOnDeath.cs" />
         <Compile Include="Celes_HediffDefOf.cs" />
         <Compile Include="Celes_RecipeInstallImplant.cs" />
         <Compile Include="Celes_RecipeSurgery.cs" />
         <Compile Include="Celes_StatPart.cs" />
+        <Compile Include="Celes_StatDefOf.cs" />
         <Compile Include="Celes_ThingDefOf.cs" />
         <Compile Include="CompUseEffect_CallReinforcement.cs" />
         <Compile Include="GameComponent_Celes.cs" />

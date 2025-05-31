@@ -4,32 +4,48 @@ using Verse;
 
 namespace CelesFeature
 {
-	public class Celes_HediffCompSpawner : HediffComp
+	public class Celes_CompSpawner : ThingComp
 	{
 		private int ticksUntilSpawn;
 
 		public Celes_CompProperties_Spawner PropsSpawner => (Celes_CompProperties_Spawner)props;
 
-		private bool PowerOn => Pawn.GetComp<CompPowerTrader>()?.PowerOn ?? false;
+		private bool PowerOn => parent.GetComp<CompPowerTrader>()?.PowerOn ?? false;
 
-		public override void  CompPostMake()
+		private bool HasFuel => parent.GetComp<CompRefuelable>()?.HasFuel ?? false;
+
+		private float spawnIntervalH => parent.GetStatValue(Celes_StatDefOf.Celes_spawnInterval);
+
+		private int spawnInterval => (int)(spawnIntervalH * 2500f);
+			
+		private int spawnCount => (int)parent.GetStatValue(Celes_StatDefOf.Celes_spawnCount);
+
+		public override void PostSpawnSetup(bool respawningAfterLoad)
 		{
+			if (!respawningAfterLoad)
+			{
 				ResetCountdown();
+			}
 		}
-
-		public override void CompPostTick(ref float severityAdjustment)
+		
+		public override void CompTick()
 		{
 			TickInterval(1);
+		}
+
+		public override void CompTickRare()
+		{
+			TickInterval(250);
 		}
 		
 		private void TickInterval(int interval)
 		{
-			if (!Pawn.Spawned)
+			if (!parent.Spawned)
 			{
 				return;
 			}
 
-			CompCanBeDormant comp = Pawn.GetComp<CompCanBeDormant>();
+			CompCanBeDormant comp = parent.GetComp<CompCanBeDormant>();
 			if (comp != null)
 			{
 				if (!comp.Awake)
@@ -37,15 +53,18 @@ namespace CelesFeature
 					return;
 				}
 			}
-			else if (Pawn.Position.Fogged(Pawn.Map))
+			else if (parent.Position.Fogged(parent.Map))
 			{
 				return;
 			}
 
 			if (!PropsSpawner.requiresPower || PowerOn)
 			{
-				ticksUntilSpawn -= interval;
-				CheckShouldSpawn();
+				if (!PropsSpawner.needFuel || HasFuel)
+				{
+					ticksUntilSpawn -= interval;
+					CheckShouldSpawn();
+				}
 			}
 		}
 
@@ -60,7 +79,7 @@ namespace CelesFeature
 
 		public bool TryDoSpawn()
 		{
-			if (!Pawn.Spawned)
+			if (!parent.Spawned)
 			{
 				return false;
 			}
@@ -70,13 +89,13 @@ namespace CelesFeature
 				int num = 0;
 				for (int i = 0; i < 9; i++)
 				{
-					IntVec3 c = Pawn.Position + GenAdj.AdjacentCellsAndInside[i];
-					if (!c.InBounds(Pawn.Map))
+					IntVec3 c = parent.Position + GenAdj.AdjacentCellsAndInside[i];
+					if (!c.InBounds(parent.Map))
 					{
 						continue;
 					}
 
-					List<Thing> thingList = c.GetThingList(Pawn.Map);
+					List<Thing> thingList = c.GetThingList(parent.Map);
 					for (int j = 0; j < thingList.Count; j++)
 					{
 						if (thingList[j].def == PropsSpawner.thingToSpawn)
@@ -91,27 +110,27 @@ namespace CelesFeature
 				}
 			}
 
-			if (TryFindSpawnCell(Pawn, PropsSpawner.thingToSpawn, PropsSpawner.spawnCount, out var result))
+			if (TryFindSpawnCell(parent, PropsSpawner.thingToSpawn, spawnCount, out var result))
 			{
 				Thing thing = ThingMaker.MakeThing(PropsSpawner.thingToSpawn);
-				thing.stackCount = PropsSpawner.spawnCount;
+				thing.stackCount = spawnCount;
 				if (thing == null)
 				{
-					Log.Error("Could not spawn anything for " + Pawn);
+					Log.Error("Could not spawn anything for " + parent);
 				}
 
-				if (PropsSpawner.inheritFaction && thing.Faction != Pawn.Faction)
+				if (PropsSpawner.inheritFaction && thing.Faction != parent.Faction)
 				{
-					thing.SetFaction(Pawn.Faction);
+					thing.SetFaction(parent.Faction);
 				}
 
-				GenPlace.TryPlaceThing(thing, result, Pawn.Map, ThingPlaceMode.Direct, out var lastResultingThing);
+				GenPlace.TryPlaceThing(thing, result, parent.Map, ThingPlaceMode.Direct, out var lastResultingThing);
 				if (PropsSpawner.spawnForbidden)
 				{
 					lastResultingThing.SetForbidden(value: true);
 				}
 
-				if (PropsSpawner.showMessageIfOwned && Pawn.Faction == Faction.OfPlayer)
+				if (PropsSpawner.showMessageIfOwned && parent.Faction == Faction.OfPlayer)
 				{
 					Messages.Message("MessageCompSpawnerSpawnedItem".Translate(PropsSpawner.thingToSpawn.LabelCap),
 						thing, MessageTypeDefOf.PositiveEvent);
@@ -123,7 +142,7 @@ namespace CelesFeature
 			return false;
 		}
 
-		public static bool TryFindSpawnCell(Thing Pawn, ThingDef thingToSpawn, int spawnCount, out IntVec3 result)
+		public static bool TryFindSpawnCell(Thing Pawn, ThingDef thingToSpawn, int _spawnCount, out IntVec3 result)
 		{
 			foreach (IntVec3 item in GenAdj.CellsAdjacent8Way(Pawn).InRandomOrder())
 			{
@@ -147,7 +166,7 @@ namespace CelesFeature
 					Thing thing = thingList[i];
 					if (thing.def.category == ThingCategory.Item && (thing.def != thingToSpawn ||
 					                                                 thing.stackCount > thingToSpawn.stackLimit -
-					                                                 spawnCount))
+					                                                 _spawnCount))
 					{
 						flag = true;
 						break;
@@ -167,16 +186,16 @@ namespace CelesFeature
 
 		private void ResetCountdown()
 		{
-			ticksUntilSpawn = PropsSpawner.spawnIntervalRange.RandomInRange;
+			ticksUntilSpawn = spawnInterval;
 		}
 
-		public override void CompExposeData()
+		public override void PostExposeData()
 		{
 			string text = (PropsSpawner.saveKeysPrefix.NullOrEmpty() ? null : (PropsSpawner.saveKeysPrefix + "_"));
 			Scribe_Values.Look(ref ticksUntilSpawn, text + "ticksUntilSpawn", 0);
 		}
 
-		public override IEnumerable<Gizmo> CompGetGizmos()
+		public override IEnumerable<Gizmo> CompGetGizmosExtra()
 		{
 			if (DebugSettings.ShowDevGizmos)
 			{
@@ -190,6 +209,15 @@ namespace CelesFeature
 				};
 				yield return command_Action;
 			}
+		}
+
+		public override string CompInspectStringExtra()
+		{
+			if (PropsSpawner.writeTimeLeftToSpawn && (!PropsSpawner.requiresPower || PowerOn))
+			{
+				return "NextSpawnedItemIn".Translate(GenLabel.ThingLabel(PropsSpawner.thingToSpawn, null, spawnCount)).Resolve() + ": " + ticksUntilSpawn.ToStringTicksToPeriod().Colorize(ColoredText.DateTimeColor);
+			}
+			return null;
 		}
 	}
 }

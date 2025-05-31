@@ -3,7 +3,7 @@ using Verse;
 
 namespace CelesFeature
 {
-    public class Celes_HediffComp_RemoveHediffOnDeath:HediffComp
+    public class Celes_HediffComp_RemoveHediffOnDeath : HediffComp
     {
         public override void Notify_PawnKilled()
         {

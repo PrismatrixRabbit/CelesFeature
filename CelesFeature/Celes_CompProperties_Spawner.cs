@@ -1,15 +1,14 @@
-using RimWorld;
 using Verse;
 
 namespace CelesFeature
 {
-        public class Celes_CompProperties_Spawner : HediffCompProperties
+        public class Celes_CompProperties_Spawner : CompProperties
         {
             public ThingDef thingToSpawn;
 
             public int spawnCount = 1;
 
-            public IntRange spawnIntervalRange = new IntRange(100, 100);
+            public int spawnInterval = 1;
 
             public int spawnMaxAdjacent = -1;
 
@@ -25,9 +24,11 @@ namespace CelesFeature
 
             public bool inheritFaction;
 
+            public bool needFuel;
+
             public Celes_CompProperties_Spawner()
             {
-                compClass = typeof(Celes_HediffCompSpawner);
+                compClass = typeof(Celes_CompSpawner);
             }
         }
 

@@ -141,8 +141,8 @@ namespace CelesFeature
                     Patch_Faction.ConsumeRequiredThings(this.requests, map);
                 }
                 IntVec3 c = DropCellFinder.TradeDropSpot(map);
-                ActiveDropPod activeDropPod = (ActiveDropPod)ThingMaker.MakeThing(this.def.dropPod);
-                activeDropPod.Contents = new ActiveDropPodInfo()
+                ActiveTransporter activeDropPod = (ActiveTransporter)ThingMaker.MakeThing(this.def.dropPod);
+                activeDropPod.Contents = new ActiveTransporterInfo()
                 {
                     leaveSlag = false
                 };

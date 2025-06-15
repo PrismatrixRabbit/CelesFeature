@@ -113,7 +113,7 @@ namespace CelesFeature
 			base.StartStrike();
 		}
 
-		public override void Tick()
+		protected override void Tick()
 		{
 			if (base.Destroyed)
 			{

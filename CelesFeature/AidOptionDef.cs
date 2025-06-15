@@ -27,8 +27,8 @@ namespace CelesFeature
         public override void Work(Map map)
         {
             IntVec3 c = DropCellFinder.TradeDropSpot(map);
-            ActiveDropPod activeDropPod = (ActiveDropPod)ThingMaker.MakeThing(this.dropPod);
-            activeDropPod.Contents = new ActiveDropPodInfo() 
+            ActiveTransporter activeDropPod = (ActiveTransporter)ThingMaker.MakeThing(this.dropPod);
+            activeDropPod.Contents = new ActiveTransporterInfo() 
             {
                 leaveSlag = false
             };

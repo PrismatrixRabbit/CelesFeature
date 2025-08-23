@@ -1,7 +1,5 @@
 ﻿using RimWorld;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using UnityEngine;
 using Verse;
@@ -14,10 +12,10 @@ namespace CelesFeature
     {
         public Sustainer workingSound;
         public CompPowerTrader compPowerTrader;
-        public Comp_Celes_Linker compLinker;
         public Comp_Celes_ConsumptionFactors compConsumptionFactors;
         public Comp_Celes_Terminal compTerminal;
         public Comp_Celes_AutomaticIndustry compAutomaticIndustry;
+        public Building_Celes_Core core;
 
         public Celes_Bill_AutomaticIndustry activeBill;
         public ThingOwner innerContainer;
@@ -35,7 +33,6 @@ namespace CelesFeature
         {
             base.SpawnSetup(map, respawningAfterLoad);
             compPowerTrader = GetComp<CompPowerTrader>();
-            compLinker = GetComp<Comp_Celes_Linker>();
             compConsumptionFactors = GetComp<Comp_Celes_ConsumptionFactors>();
             compTerminal = GetComp<Comp_Celes_Terminal>();
             compAutomaticIndustry = GetComp<Comp_Celes_AutomaticIndustry>();
@@ -140,7 +137,6 @@ namespace CelesFeature
 
         public Building_Celes_Core GetCore()
         {
-            Building_Celes_Core core = (Building_Celes_Core)compLinker.linkedThings.First(x => x.GetType() == typeof(Building_Celes_Core));
             return core;
         }
         public bool IsActive()
@@ -199,6 +195,10 @@ namespace CelesFeature
         }
         public virtual void ExtraTickRare()
         {
+            if (core != null && (core.DestroyedOrNull() || !core.Spawned))
+            {
+                core = null;
+            }
             if (base.Spawned && compPowerTrader.PowerOn)
             {
                 if (!this.IsIdle())
@@ -230,6 +230,17 @@ namespace CelesFeature
             if (CanWork() && activeBill != null)
             {
                 activeBill.AppendInspectionData(stringBuilder);
+            }
+
+            if (core != null)
+            {
+                string text = "Celes_Keyed_ConnectedToCore".Translate();
+                stringBuilder.AppendLine(text);
+            }
+            else
+            {
+                string text = "Celes_Keyed_NoCoreConnected".Translate();
+                stringBuilder.AppendLine(text);
             }
 
             return stringBuilder.ToString().TrimEndNewlines();
@@ -309,6 +320,22 @@ namespace CelesFeature
             barDrawData.fillPercent = CurrentBillFormingPercent;
             barDrawData.rotation = Rotation;
             GenDraw.DrawFillableBar(barDrawData);
+        }
+
+        public override void DrawExtraSelectionOverlays()
+        {
+            base.DrawExtraSelectionOverlays();
+            if (core != null)
+            {
+                if (core.IsActive())
+                {
+                    GenDraw.DrawLineBetween(this.TrueCenter(), core.TrueCenter());
+                }
+                else
+                {
+                    GenDraw.DrawLineBetween(this.TrueCenter(), core.TrueCenter(), MaterialPool.MatFrom(GenDraw.LineTexPath, ShaderDatabase.Transparent, new Color(1f, 0.5f, 0.5f)));
+                }
+            }
         }
     }
 }

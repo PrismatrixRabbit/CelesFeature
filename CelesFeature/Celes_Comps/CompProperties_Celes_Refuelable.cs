@@ -129,7 +129,7 @@ namespace CelesFeature
 
         public CompProperties_Celes_Refuelable()
         {
-            compClass = typeof(CompRefuelable);
+            compClass = typeof(Comp_Celes_Refuelable);
         }
 
         public override void ResolveReferences(ThingDef parentDef)

@@ -66,6 +66,14 @@ namespace CelesFeature
                         if (CanBeLinked(item, this.parent))
                         {
                             linkedThings.Add(item);
+                            if (parent is Building_Celes_Core core1 && item is Building_Celes_Terminal terminal1)
+                            {
+                                terminal1.core = core1;
+                            }
+                            if (parent is Building_Celes_Core core2 && item is Celes_Building_AutomaticIndustry terminal2)
+                            {
+                                terminal2.core = core2;
+                            }
                         }
                     }
                 }
@@ -95,32 +103,28 @@ namespace CelesFeature
                     }
                 }
             }
-            else
-            {
-                if (target is Building_Celes_Core core)
-                {
-                    if (!core.compLinker.linkedThings.Contains(thisThing))
-                    {
-                        return false;
-                    }
-                }
-            }
 
             return true;
         }
 
-        public bool IsActive(Thing thing)
+        private bool IsActive(Thing thing)
         {
-            CompPowerPlant compPowerPlant = thing.TryGetComp<CompPowerPlant>();
-            if (compPowerPlant != null && compPowerPlant.PowerOutput <= 0)
+            if (thing is Building_Celes_Core core)
             {
-                return false;
+                if (!core.IsActive())
+                {
+                    return false;
+                }
             }
-
-            CompPowerTrader compPowerTrader = thing.TryGetComp<CompPowerTrader>();
-            if (compPowerTrader != null && !compPowerTrader.PowerOn)
+            else
             {
-                return false;
+                if (thing.TryGetComp<CompPowerTrader>() != null)
+                {
+                    if (!thing.TryGetComp<CompPowerTrader>().PowerOn)
+                    {
+                        return false;
+                    }
+                }
             }
 
             return true;

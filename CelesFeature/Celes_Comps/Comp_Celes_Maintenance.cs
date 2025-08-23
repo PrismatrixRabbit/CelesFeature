@@ -12,7 +12,7 @@ namespace CelesFeature
         public float maintenanceThreshold = 0.6f;
         public int lastMaintenanceTick = -1;
         private int timing = 0;
-        
+
         public override void PostExposeData()
         {
             Scribe_Values.Look<float>(ref maintenance, "Celes_SaveKey_float_Comp_Maintenance_maintenance");
@@ -91,7 +91,6 @@ namespace CelesFeature
             maintenance += Props.recoveryAmount;
             lastMaintenanceTick = Find.TickManager.TicksGame;
         }
-        
         public bool ShouldDecay()
         {
             if (lastMaintenanceTick > 0)

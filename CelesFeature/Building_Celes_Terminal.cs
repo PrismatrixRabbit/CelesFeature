@@ -1,5 +1,5 @@
 ﻿using RimWorld;
-using System.Linq;
+using UnityEngine;
 using Verse;
 
 namespace CelesFeature
@@ -7,9 +7,9 @@ namespace CelesFeature
     public class Building_Celes_Terminal : Building
     {
         public CompPowerTrader compPowerTrader;
-        public Comp_Celes_Linker compLinker;
         public Comp_Celes_ConsumptionFactors compConsumptionFactors;
         public Comp_Celes_Terminal compTerminal;
+        public Building_Celes_Core core;
 
         private int tickRare = 0;
 
@@ -22,14 +22,12 @@ namespace CelesFeature
         {
             base.SpawnSetup(map, respawningAfterLoad);
             compPowerTrader = GetComp<CompPowerTrader>();
-            compLinker = GetComp<Comp_Celes_Linker>();
             compConsumptionFactors = GetComp<Comp_Celes_ConsumptionFactors>();
             compTerminal = GetComp<Comp_Celes_Terminal>();
         }
 
         public Building_Celes_Core GetCore()
         {
-            Building_Celes_Core core = (Building_Celes_Core)compLinker.linkedThings.First(x => x.GetType() == typeof(Building_Celes_Core));
             return core;
         }
         public float GetEfficiency()
@@ -63,6 +61,10 @@ namespace CelesFeature
         }
         public virtual void ExtraTickRare()
         {
+            if (core != null && (core.DestroyedOrNull() || !core.Spawned))
+            {
+                core = null;
+            }
             if (base.Spawned && compPowerTrader.PowerOn)
             {
                 if (!this.IsIdle())
@@ -72,6 +74,22 @@ namespace CelesFeature
                 else
                 {
                     compPowerTrader.PowerOutput = (0f - compPowerTrader.Props.PowerConsumption) * compConsumptionFactors.Props.powerIdleFactor;
+                }
+            }
+        }
+
+        public override void DrawExtraSelectionOverlays()
+        {
+            base.DrawExtraSelectionOverlays();
+            if (core != null)
+            {
+                if (core.IsActive())
+                {
+                    GenDraw.DrawLineBetween(this.TrueCenter(), core.TrueCenter());
+                }
+                else
+                {
+                    GenDraw.DrawLineBetween(this.TrueCenter(), core.TrueCenter(), MaterialPool.MatFrom(GenDraw.LineTexPath, ShaderDatabase.Transparent, new Color(1f, 0.5f, 0.5f)));
                 }
             }
         }

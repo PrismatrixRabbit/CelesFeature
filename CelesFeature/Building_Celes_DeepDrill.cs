@@ -212,5 +212,19 @@ namespace CelesFeature
             }
             yield break;
         }
+
+        public override string GetInspectString()
+        {
+            string text = "";
+            if (core != null)
+            {
+                text += "\n" + "Celes_Keyed_ConnectedToCore".Translate();
+            }
+            else
+            {
+                text += "\n" + "Celes_Keyed_NoCoreConnected".Translate();
+            }
+            return base.GetInspectString() + text;
+        }
     }
 }

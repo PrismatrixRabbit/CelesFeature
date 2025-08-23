@@ -1,4 +1,5 @@
-﻿using Verse;
+﻿using System.Collections.Generic;
+using Verse;
 
 namespace CelesFeature
 {
@@ -9,6 +10,7 @@ namespace CelesFeature
             this.compClass = typeof(Comp_Celes_Terminal);
         }
 
+        public List<ThingDef> thingsCanBeCore = new List<ThingDef>();
         public float extraPowerConsumptionForCore = 0f;
         public float extraFuelConsumptionForCore = 0f;
         public float extraMaintenanceDecayForCore = 0f;

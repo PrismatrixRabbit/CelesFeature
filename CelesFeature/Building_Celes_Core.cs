@@ -47,6 +47,13 @@ namespace CelesFeature
                     return false;
                 }
             }
+            if (compPowerTrader != null)
+            {
+                if (!compPowerTrader.PowerOn)
+                {
+                    return false;
+                }
+            }
             return true;
         }
         protected override void Tick()

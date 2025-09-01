@@ -361,6 +361,7 @@ namespace CelesFeature
 
     }
     
+    [StaticConstructorOnStartup]
     public class Celes_Gizmo_MutiFunctionalShieldStatus : Gizmo
     {
 	    public Celes_Comp_MutiFunctionalShield shield;

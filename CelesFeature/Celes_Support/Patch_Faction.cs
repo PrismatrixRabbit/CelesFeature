@@ -1,10 +1,7 @@
 ﻿using HarmonyLib;
 using RimWorld;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Verse;
 
 namespace CelesFeature
@@ -80,13 +77,13 @@ namespace CelesFeature
 
         public static int GetKeyCount(Map map) 
         {
-            return map.listerThings.ThingsOfDef(Celes_ThingDefOf.CelesKeyCard).FindAll(s => s.Spawned && s.Position.GetZone(map) is Zone_Stockpile).Sum(s => s.stackCount);
+            return map.listerThings.ThingsOfDef(Celes_ThingDefOf.CelesKeyCard).FindAll(s => s.IsInValidStorage()).Sum(s => s.stackCount);
         }
         public static bool CheckRequiredThings(List<ThingDefCountClass> requiredThings,Map map)
         {
             Dictionary<ThingDef, int> counts = new Dictionary<ThingDef, int>();
             requiredThings.ForEach(d => counts.Add(d.thingDef,d.count));
-            foreach (Thing t in map.listerThings.GetAllThings(t => t.Spawned && t.Position.GetZone(map) is Zone_Stockpile))
+            foreach (Thing t in map.listerThings.GetAllThings(t => t.IsInValidStorage()))
             {
                 if (counts.ContainsKey(t.def))
                 {
@@ -99,7 +96,7 @@ namespace CelesFeature
         {
             Dictionary<ThingDef, int> counts = new Dictionary<ThingDef, int>();
             requiredThings.ForEach(d => counts.Add(d.thingDef, d.count));
-            foreach (Thing t in map.listerThings.GetAllThings(t => t.Spawned && t.Position.GetZone(map) is Zone_Stockpile).ToList().ListFullCopy())
+            foreach (Thing t in map.listerThings.GetAllThings(t => t.IsInValidStorage()).ToList().ListFullCopy())
             {
                 if (counts.ContainsKey(t.def) && counts[t.def] >= 1)
                 {

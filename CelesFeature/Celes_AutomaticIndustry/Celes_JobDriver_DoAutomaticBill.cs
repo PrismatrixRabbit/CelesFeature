@@ -130,6 +130,7 @@ namespace CelesFeature
             {
                 Thing thing = toil.actor.jobs.curJob.GetTarget(TargetIndex.A).Thing;
                 Celes_Building_AutomaticIndustry building = thing as Celes_Building_AutomaticIndustry;
+                building.ActiveBill.Notify_IterationCompleted();
                 building.EjectContents();
             };
             return toil;
@@ -267,7 +268,6 @@ namespace CelesFeature
                     {
                         Celes_Building_AutomaticIndustry worktable = (Celes_Building_AutomaticIndustry)toil.actor.CurJob.bill.billStack.billGiver;
                         worktable.EjectContents();
-                        billauto.Reset();
                         return (billauto.suspended || billauto.paused);
                     }
                 }

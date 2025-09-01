@@ -20,15 +20,18 @@ namespace CelesFeature
         public void DrawLinesToPotentialThingsToLinkTo(ThingDef myDef, IntVec3 myPos, Rot4 myRot, Map map)
         {
             CompProperties_Celes_Linker compProperties = myDef.GetCompProperties<CompProperties_Celes_Linker>();
+
+            Vector3 a = GenThing.TrueCenter(myPos, myRot, myDef.size, myDef.Altitude);
+            GenDraw.DrawRadiusRing(a.ToIntVec3(), compProperties.maxLinkableDistance);
+
             if (compProperties.thingsToLink == null)
             {
                 return;
             }
 
-            Vector3 a = GenThing.TrueCenter(myPos, myRot, myDef.size, myDef.Altitude);
             for (int i = 0; i < compProperties.thingsToLink.Count; i++)
             {
-                foreach (Thing item in map.listerThings.ThingsOfDef(compProperties.thingsToLink[i]))
+                foreach (Thing item in map.listerThings.ThingsOfDef(compProperties.thingsToLink[i].thingDef))
                 {
                     if (CanPotentiallyLinkTo(item.def, item.Position, item.Rotation, myDef, myPos, myRot))
                     {

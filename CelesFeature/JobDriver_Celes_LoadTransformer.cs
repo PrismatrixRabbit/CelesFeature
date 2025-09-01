@@ -29,14 +29,42 @@ namespace CelesFeature
 
         protected override IEnumerable<Toil> MakeNewToils()
         {
+            yield return Toils_General.DoAtomic(delegate
+            {
+                job.count = 1;
+            });
             Building_Celes_Transformer Transformer = TransformerThing as Building_Celes_Transformer;
-            this.FailOnDespawnedNullOrForbidden(TransformerInd);
+            this.FailOn(delegate ()
+            {
+                if (Transformer.chosenTransformingMode == 0)
+                {
+                    if (TargetB.Thing is Pawn)
+                    {
+                        return true;
+                    }
+                }
+                if (Transformer.chosenTransformingMode == 1)
+                {
+                    if (!(TargetB.Thing is Pawn))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            });
             AddEndCondition(() => Transformer.NeedToBeLoaded() ? JobCondition.Ongoing : JobCondition.Succeeded);
             Toil reserveFuel = Toils_Reserve.Reserve(LoadInd);
             yield return reserveFuel;
             yield return Toils_Goto.GotoThing(LoadInd, PathEndMode.ClosestTouch).FailOnDespawnedNullOrForbidden(LoadInd).FailOnSomeonePhysicallyInteracting(LoadInd);
-            yield return Toils_Haul.StartCarryThing(LoadInd, putRemainderInQueue: false, subtractNumTakenFromJobCount: true).FailOnDestroyedNullOrForbidden(LoadInd);
-            yield return Toils_Haul.CheckForGetOpportunityDuplicate(reserveFuel, LoadInd, TargetIndex.None, takeFromValidStorage: true);
+            if (Transformer.chosenTransformingMode == 0)
+            {
+                yield return Toils_Haul.StartCarryThing(LoadInd, putRemainderInQueue: false, subtractNumTakenFromJobCount: true).FailOnDestroyedNullOrForbidden(LoadInd);
+                yield return Toils_Haul.CheckForGetOpportunityDuplicate(reserveFuel, LoadInd, TargetIndex.None, takeFromValidStorage: true);
+            }
+            else
+            {
+                yield return Toils_Haul.StartCarryThing(LoadInd);
+            }
             yield return Toils_Goto.GotoThing(TransformerInd, PathEndMode.Touch);
             yield return Toils_General.Wait(LoadingDuration).FailOnDestroyedNullOrForbidden(LoadInd).FailOnDestroyedNullOrForbidden(TransformerInd)
                 .FailOnCannotTouch(TransformerInd, PathEndMode.Touch)
@@ -44,7 +72,7 @@ namespace CelesFeature
             yield return Loaded(TransformerInd, LoadInd);
         }
 
-        private static Toil Loaded(TargetIndex transformerInd, TargetIndex fuelInd)
+        private static Toil Loaded(TargetIndex transformerInd, TargetIndex loadInd)
         {
             Toil toil = ToilMaker.MakeToil("FinalizeLoading");
             toil.initAction = delegate
@@ -54,11 +82,26 @@ namespace CelesFeature
                 Building_Celes_Transformer transformer = transformerThing as Building_Celes_Transformer;
                 if (toil.actor.CurJob.placedThings.NullOrEmpty())
                 {
-                    transformer.innerContainer.TryAddRangeOrTransfer(new List<Thing> { curJob.GetTarget(fuelInd).Thing });
+                    transformer.innerContainer.TryAddRangeOrTransfer(new List<Thing> { curJob.GetTarget(loadInd).Thing });
                 }
                 else
                 {
                     transformer.innerContainer.TryAddRangeOrTransfer(toil.actor.CurJob.placedThings.Select((ThingCountClass p) => p.thing).ToList());
+                }
+                if (curJob.GetTarget(loadInd).Thing is Pawn pawn)
+                {
+                    if (pawn.RaceProps.Humanlike)
+                    {
+                        transformer.Initialize(600000, true);
+                    }
+                    else
+                    {
+                        transformer.Initialize(60000, false);
+                    }
+                }
+                else
+                {
+                    transformer.Initialize(60000, false);
                 }
             };
             toil.defaultCompleteMode = ToilCompleteMode.Instant;

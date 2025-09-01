@@ -9,7 +9,8 @@ namespace CelesFeature
             this.compClass = typeof(Comp_Celes_Maintenance);
         }
 
-        public int workAmount = 600;
+        public float maintenanceCapacity = 1.2f;
+        public int workAmount = 1200;
         public float recoveryAmount = 0.3f;
         public float maintenanceFreeDays = 1f;
         public float decayPerDay = 0.1f;

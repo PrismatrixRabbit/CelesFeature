@@ -26,7 +26,7 @@ namespace CelesFeature
             Linker = parent.TryGetComp<Comp_Celes_Linker>();
         }
 
-        public float maintenancePercentOfMax => maintenance / 1.2f;
+        public float maintenancePercentOfMax => maintenance;
 
         public CompProperties_Celes_Maintenance Props
         {
@@ -82,13 +82,24 @@ namespace CelesFeature
                         }
                     }
                 }
-                maintenance -= (num / 240);
+                if (maintenance > 0)
+                {
+                    maintenance -= (num / 240);
+                    if (maintenance < 0)
+                    {
+                        maintenance = 0;
+                    }
+                }
             }
         }
 
         public void GetMaintenance()
         {
             maintenance += Props.recoveryAmount;
+            if (maintenance > Props.maintenanceCapacity)
+            {
+                maintenance = Props.maintenanceCapacity;
+            }
             lastMaintenanceTick = Find.TickManager.TicksGame;
         }
         public bool ShouldDecay()
@@ -116,6 +127,37 @@ namespace CelesFeature
             if (parent.Faction == Faction.OfPlayer)
             {
                 yield return new Gizmo_Celes_Maintenance(this);
+            }
+            if (DebugSettings.ShowDevGizmos)
+            {
+                yield return new Command_Action
+                {
+                    action = delegate
+                    {
+                        maintenance = 0;
+                    },
+                    defaultLabel = "DEV: Maintenance 0%"
+                };
+                yield return new Command_Action
+                {
+                    action = delegate
+                    {
+                        maintenance = Props.maintenanceCapacity;
+                    },
+                    defaultLabel = "DEV: Maintenance full"
+                };
+                yield return new Command_Action
+                {
+                    action = delegate
+                    {
+                        maintenance -= 0.2f;
+                        if (maintenance < 0f)
+                        {
+                            maintenance = 0f;
+                        }
+                    },
+                    defaultLabel = "DEV: Maintenance -20%"
+                };
             }
             yield break;
         }

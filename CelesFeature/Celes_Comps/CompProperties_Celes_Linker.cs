@@ -10,8 +10,14 @@ namespace CelesFeature
             this.compClass = typeof(Comp_Celes_Linker);
         }
 
-        public List<ThingDef> thingsToLink;
+        public List<SubProperties_Celes_Linker> thingsToLink;
         public float maxLinkableDistance = 8f;
         public int maxLinkableCount = 4;
+    }
+
+    public class SubProperties_Celes_Linker
+    {
+        public ThingDef thingDef;
+        public int countLimit = 0;
     }
 }

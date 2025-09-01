@@ -17,6 +17,8 @@ namespace CelesFeature
         public int powerOffEjectTime = 15000;
         public HediffDef transformedHediff;
         public ThoughtDef transformedThought;
+        public bool killModeTechLock = false;
+        public ResearchProjectDef techUnlockKillMode;
     }
     public class SubProperties_Celes_Transformer
     {

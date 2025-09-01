@@ -1,4 +1,6 @@
-﻿using RimWorld;
+﻿using HarmonyLib;
+using RimWorld;
+using System.Text;
 using Verse;
 
 namespace CelesFeature
@@ -31,6 +33,13 @@ namespace CelesFeature
         public float GetCoreEfficiency()
         {
             float num = 1f;
+            if (compLinker != null && compLinker.ModifierList.Count > 0)
+            {
+                foreach (Comp_Celes_ModifierLinker comp in compLinker.ModifierList)
+                {
+                    num += comp.Props.extraCoreEfficiency;
+                }
+            }
             if (compMaintenance != null)
             {
                 num *= compMaintenance.Efficiency;
@@ -50,6 +59,13 @@ namespace CelesFeature
             if (compPowerTrader != null)
             {
                 if (!compPowerTrader.PowerOn)
+                {
+                    return false;
+                }
+            }
+            if (compMaintenance != null)
+            {
+                if (compMaintenance.maintenance <= 0)
                 {
                     return false;
                 }
@@ -94,6 +110,27 @@ namespace CelesFeature
                     compPowerTrader.PowerOutput = (0f - num) * compConsumptionFactors.Props.powerIdleFactor;
                 }
             }
+        }
+
+        public override string GetInspectString()
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            string inspectString = base.GetInspectString();
+            if (!inspectString.NullOrEmpty())
+            {
+                stringBuilder.AppendLine(inspectString);
+            }
+
+            if (compLinker != null)
+            {
+                string text1 = "Celes_Keyed_ConnectionCapacity".Translate(compLinker.LinkedCount, compLinker.MaxLinkableCount);
+                stringBuilder.AppendLine(text1);
+            }
+
+            string text2 = "Celes_Keyed_TerminalEfficiencyFactor".Translate(GetCoreEfficiency().ToStringPercent()) + (IsActive() ? "(" + "Celes_Keyed_CoreInactive".Translate().ToString() + ")" : "");
+            stringBuilder.AppendLine(text2);
+
+            return stringBuilder.ToString().TrimEndNewlines();
         }
     }
 }

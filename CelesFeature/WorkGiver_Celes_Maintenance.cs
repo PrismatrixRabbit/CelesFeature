@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Verse.AI;
 using Verse;
+using System.Linq;
 
 namespace CelesFeature
 {
@@ -48,6 +49,11 @@ namespace CelesFeature
             }
 
             return true;
+        }
+
+        public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
+        {
+            return pawn.Map.spawnedThings.ToList().FindAll(x => x.TryGetComp<Comp_Celes_Maintenance>() != null && x.TryGetComp<Comp_Celes_Maintenance>().ShouldMaintain());
         }
 
         public override Job JobOnThing(Pawn pawn, Thing thing, bool forced)

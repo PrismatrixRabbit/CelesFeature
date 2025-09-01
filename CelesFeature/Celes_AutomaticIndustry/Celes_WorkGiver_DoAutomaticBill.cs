@@ -258,7 +258,7 @@ namespace CelesFeature
 
         private static Job WorkOnFormedBill(Thing giver, Celes_Bill_AutomaticIndustry bill)
         {
-            Job job = JobMaker.MakeJob(JobDefOf.DoBill, giver);
+            Job job = JobMaker.MakeJob(Celes_DefOf_Job.Celes_Job_DoAutomaticBill, giver);
             job.bill = bill;
             return job;
         }

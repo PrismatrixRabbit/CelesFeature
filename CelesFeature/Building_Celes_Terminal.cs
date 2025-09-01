@@ -1,4 +1,5 @@
 ﻿using RimWorld;
+using System.Text;
 using UnityEngine;
 using Verse;
 
@@ -10,6 +11,7 @@ namespace CelesFeature
         public Comp_Celes_ConsumptionFactors compConsumptionFactors;
         public Comp_Celes_Terminal compTerminal;
         public Building_Celes_Core core;
+        public Comp_Celes_Linker compLinker;
 
         private int tickRare = 0;
 
@@ -24,6 +26,7 @@ namespace CelesFeature
             compPowerTrader = GetComp<CompPowerTrader>();
             compConsumptionFactors = GetComp<Comp_Celes_ConsumptionFactors>();
             compTerminal = GetComp<Comp_Celes_Terminal>();
+            compLinker = GetComp<Comp_Celes_Linker>();
         }
 
         public Building_Celes_Core GetCore()
@@ -32,20 +35,28 @@ namespace CelesFeature
         }
         public float GetEfficiency()
         {
+            float num = 0;
+            if (compLinker != null && compLinker.ModifierList.Count > 0)
+            {
+                foreach (Comp_Celes_ModifierLinker comp in compLinker.ModifierList)
+                {
+                    num += comp.Props.extraTerminalEfficiency;
+                }
+            }
             if (GetCore() != null)
             {
                 if (GetCore().IsActive())
                 {
-                    return GetCore().GetCoreEfficiency();
+                    return GetCore().GetCoreEfficiency() + num;
                 }
                 else
                 {
-                    return compTerminal.Props.efficiencyWithoutCore;
+                    return compTerminal.Props.efficiencyWithoutCore + num;
                 }
             }
             else
             {
-                return compTerminal.Props.efficiencyWithoutCore;
+                return compTerminal.Props.efficiencyWithoutCore + num;
             }
         }
 
@@ -92,6 +103,21 @@ namespace CelesFeature
                     GenDraw.DrawLineBetween(this.TrueCenter(), core.TrueCenter(), MaterialPool.MatFrom(GenDraw.LineTexPath, ShaderDatabase.Transparent, new Color(1f, 0.5f, 0.5f)));
                 }
             }
+        }
+
+        public override string GetInspectString()
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            string inspectString = base.GetInspectString();
+            if (!inspectString.NullOrEmpty())
+            {
+                stringBuilder.AppendLine(inspectString);
+            }
+
+            string text = "Celes_Keyed_CurrentEfficiency".Translate(GetEfficiency().ToStringPercent());
+            stringBuilder.AppendLine(text);
+
+            return stringBuilder.ToString().TrimEndNewlines();
         }
     }
 }

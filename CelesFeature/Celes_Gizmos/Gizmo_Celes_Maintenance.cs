@@ -27,6 +27,14 @@ namespace CelesFeature
 
         protected override string Title => "Celes_Keyed_Maintenance".Translate();
 
+        protected override bool IsDraggable
+        {
+            get
+            {
+                return true;
+            }
+        }
+
         protected override bool DraggingBar
         {
             get
@@ -47,7 +55,7 @@ namespace CelesFeature
         public override GizmoResult GizmoOnGUI(Vector2 topLeft, float maxWidth, GizmoRenderParms parms)
         {
             Rect rect = new Rect(topLeft.x, topLeft.y, GetWidth(maxWidth), 75f);
-            TooltipHandler.TipRegionByKey(rect, "Celes_Keyed_Maintenance_Tooltip".Translate(compMaintenance.maintenance, compMaintenance.Props.decayPerDay, compMaintenance.Efficiency.ToStringPercent()));
+            TooltipHandler.TipRegionByKey(rect, "Celes_Keyed_Maintenance_Tooltip".Translate(compMaintenance.maintenance.ToStringPercent(), compMaintenance.Props.decayPerDay.ToStringPercent(), compMaintenance.Efficiency.ToStringPercent(), (compMaintenance.maintenanceThreshold / 1.2f).ToStringPercent()));
 
             if (SteamDeck.IsSteamDeckInNonKeyboardMode)
             {

@@ -1,6 +1,7 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 using Verse;
 
@@ -14,6 +15,8 @@ namespace CelesFeature
         public float progress = 0f;
         public float yieldPct = 0f;
         public bool active = false;
+
+        public float ProgressToNextPortionPercent => progress / 10000f;
 
         public override void ExposeData()
         {
@@ -193,7 +196,7 @@ namespace CelesFeature
                 yield return new Command_Action
                 {
                     defaultLabel = "Celes_Keyed_ChooseProduct".Translate() + compDeepDrill.Props.processingModeRecipes[chosenProcessingModeProduct].product.label.Translate(),
-                    icon = ContentFinder<Texture2D>.Get(compDeepDrill.Props.processingModeRecipes[chosenProcessingModeProduct].product.graphicData.texPath, true),
+                    icon = compDeepDrill.Props.processingModeRecipes[chosenProcessingModeProduct].product.uiIcon,
                     action = delegate ()
                     {
                         List<FloatMenuOption> list = new List<FloatMenuOption>();
@@ -203,7 +206,7 @@ namespace CelesFeature
                             {
                                 this.chosenProcessingModeProduct = compDeepDrill.Props.processingModeRecipes.IndexOf(product);
                                 this.progress = 0f;
-                            }, MenuOptionPriority.Default, null, null, 29f, (Rect rect) => Widgets.InfoCardButton(rect.x + 5f, rect.y + (rect.height - 24f) / 2f, product.product));
+                            },product.product.uiIcon, Color.white, MenuOptionPriority.Default, null, null, 29f, (Rect rect) => Widgets.InfoCardButton(rect.x + 5f, rect.y + (rect.height - 24f) / 2f, product.product));
                             list.Add(productOption);
                         }
                         Find.WindowStack.Add(new FloatMenu(list));
@@ -215,16 +218,38 @@ namespace CelesFeature
 
         public override string GetInspectString()
         {
-            string text = "";
+            StringBuilder stringBuilder = new StringBuilder();
+            string inspectString = base.GetInspectString();
+            if (!inspectString.NullOrEmpty())
+            {
+                stringBuilder.AppendLine(inspectString);
+            }
+
+            string product = "";
+            if (chosenMode == 0)
+            {
+                GetNextResource(out var resDef, out var _, out var _);
+                product = resDef.LabelCap;
+            }
+            if (chosenMode == 1)
+            {
+                product = compDeepDrill.Props.processingModeRecipes[chosenProcessingModeProduct].product.LabelCap;
+            }
+            string text1 = "Celes_Keyed_CurrentProduct".Translate(product) + "\n" + "ProgressToNextPortion".Translate() + ": " + ProgressToNextPortionPercent.ToStringPercent("F0");
+            stringBuilder.AppendLine(text1);
+
             if (core != null)
             {
-                text += "\n" + "Celes_Keyed_ConnectedToCore".Translate();
+                string text2 = "Celes_Keyed_ConnectedToCore".Translate();
+                stringBuilder.AppendLine(text2);
             }
             else
             {
-                text += "\n" + "Celes_Keyed_NoCoreConnected".Translate();
+                string text3 = "Celes_Keyed_NoCoreConnected".Translate();
+                stringBuilder.AppendLine(text3);
             }
-            return base.GetInspectString() + text;
+
+            return stringBuilder.ToString().TrimEndNewlines();
         }
     }
 }

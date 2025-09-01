@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Verse.AI;
 using Verse;
+using System.Linq;
 
 namespace CelesFeature
 {
@@ -44,6 +45,11 @@ namespace CelesFeature
             return true;
         }
 
+        public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
+        {
+            return pawn.Map.spawnedThings.ToList().FindAll(x => x.GetType() == typeof(Building_Celes_Transformer));
+        }
+
         public override Job JobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
             return this.LoadJob(pawn, t, forced);
@@ -81,7 +87,7 @@ namespace CelesFeature
             {
                 if (transformer.chosenTransformingMode == 0)
                 {
-                    return GenClosest.ClosestThingReachable(pawn.Position, pawn.Map, ThingRequest.ForGroup(ThingRequestGroup.Everything), PathEndMode.ClosestTouch, TraverseParms.For(pawn), 9999f, Validator);
+                    return GenClosest.ClosestThingReachable(pawn.Position, pawn.Map, ThingRequest.ForGroup(ThingRequestGroup.Chunk), PathEndMode.ClosestTouch, TraverseParms.For(pawn), 9999f, Validator);
                     bool Validator(Thing x)
                     {
                         if (x.IsForbidden(pawn) || !pawn.CanReserve(x))

@@ -62,10 +62,8 @@ namespace CelesFeature
 
         public void Initialize(int finishTick, bool isHuman)
         {
-            expectedFinishTick = 0;
-            nextRewardTick = 0;
-            runningTick = 0;
             expectedFinishTick = finishTick;
+            runningTick = 0;
             if (isHuman)
             {
                 nextRewardTick = (expectedFinishTick / 3);
@@ -85,7 +83,7 @@ namespace CelesFeature
                     return true;
                 }
             }
-            if (chosenTransformingMode == 1 && wantedPawn != null && wantedPawn.Spawned && wantedPawn.Map == this.Map)
+            if (chosenTransformingMode == 1 && wantedPawn != null)
             {
                 if (innerContainer.Count < 1)
                 {
@@ -290,9 +288,26 @@ namespace CelesFeature
             }
         }
 
+        public bool UnlockedKillMode()
+        {
+            if (compTransformer.Props.killModeTechLock && !compTransformer.Props.techUnlockKillMode.IsFinished)
+            {
+                return false;
+            }
+            return true;
+        }
+
         public override string GetInspectString()
         {
             string text = "";
+            if (active)
+            {
+                text += "\n" + "Celes_Keyed_Active".Translate();
+            }
+            else
+            {
+                text += "\n" + "Celes_Keyed_Inactive".Translate();
+            }
             if (chosenTransformingMode == 0)
             {
                 text += "\n" + "Celes_Keyed_RockLoaded".Translate(innerContainer.Count, compTransformer.Props.RockModeMaxCapacity);
@@ -315,6 +330,10 @@ namespace CelesFeature
                     }
                 }
             }
+            if (IsActive())
+            {
+                text += "\n" + "Celes_Keyed_ProcessingTimeLeft".Translate((expectedFinishTick - runningTick).ToStringTicksToPeriod());
+            }
             if (DangerPowerOff())
             {
                 text += "\n" + "Celes_Keyed_TimeToEject".Translate((compTransformer.Props.powerOffEjectTime - ejectTick).ToStringTicksToPeriod());
@@ -331,7 +350,7 @@ namespace CelesFeature
             yield return new Command_Action
             {
                 defaultLabel = (chosenTransformingMode == 0 ? "Celes_Keyed_RockMode".Translate() : "Celes_Keyed_BiologicalMode".Translate()),
-                icon = (chosenTransformingMode == 0 ? ContentFinder<Texture2D>.Get("Things/Item/Chunk/ChunkStone") : ContentFinder<Texture2D>.Get("UI/Commands/DropCarriedPawn")),
+                icon = (chosenTransformingMode == 0 ? ContentFinder<Texture2D>.Get("Celes/UI/Icons/StoneChunks") : ContentFinder<Texture2D>.Get("UI/Commands/DropCarriedPawn")),
                 action = delegate ()
                 {
                     Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("Celes_Keyed_ConfirmChangeTransformingMode".Translate(), delegate
@@ -343,7 +362,7 @@ namespace CelesFeature
                         else
                         {
                             chosenTransformingMode = 0;
-                            if (innerContainer.First() is Pawn pawn)
+                            if (innerContainer.Count > 0 && innerContainer.First() is Pawn pawn)
                             {
                                 if (!pawn.RaceProps.Humanlike)
                                 {
@@ -463,27 +482,30 @@ namespace CelesFeature
                         };
                     }
                 }
-                yield return new Command_Action
+                if (UnlockedKillMode())
                 {
-                    defaultLabel = (killMode ? "Celes_Keyed_KillMode".Translate() : "Celes_Keyed_SafeMode".Translate()),
-                    icon = (killMode ? ContentFinder<Texture2D>.Get("Things/Mote/SpeechSymbols/Breakup") : ContentFinder<Texture2D>.Get("Things/Mote/Heart")),
-                    action = delegate ()
+                    yield return new Command_Action
                     {
-                        if (killMode)
+                        defaultLabel = (killMode ? "Celes_Keyed_KillMode".Translate() : "Celes_Keyed_SafeMode".Translate()),
+                        icon = (killMode ? ContentFinder<Texture2D>.Get("Things/Mote/SpeechSymbols/Breakup") : ContentFinder<Texture2D>.Get("Things/Mote/Heart")),
+                        action = delegate ()
                         {
-                            killMode = false;
+                            if (killMode)
+                            {
+                                killMode = false;
+                            }
+                            else
+                            {
+                                killMode = true;
+                            }
                         }
-                        else
-                        {
-                            killMode = true;
-                        }
-                    }
-                };
+                    };
+                }
             }
             yield return new Command_Action
             {
                 defaultLabel = "Celes_Keyed_ChooseProduct".Translate() + compTransformer.Props.transformingModeRecipes[chosenTransformingModeProduct].product.label.Translate(),
-                icon = ContentFinder<Texture2D>.Get(compTransformer.Props.transformingModeRecipes[chosenTransformingModeProduct].product.graphicData.texPath, true),
+                icon = compTransformer.Props.transformingModeRecipes[chosenTransformingModeProduct].product.uiIcon,
                 action = delegate ()
                 {
                     List<FloatMenuOption> list = new List<FloatMenuOption>();
@@ -492,7 +514,7 @@ namespace CelesFeature
                         FloatMenuOption productOption = new FloatMenuOption(product.product.label, delegate
                         {
                             this.chosenTransformingModeProduct = compTransformer.Props.transformingModeRecipes.IndexOf(product);
-                        }, MenuOptionPriority.Default, null, null, 29f, (Rect rect) => Widgets.InfoCardButton(rect.x + 5f, rect.y + (rect.height - 24f) / 2f, product.product));
+                        }, product.product.uiIcon, Color.white, MenuOptionPriority.Default, null, null, 29f, (Rect rect) => Widgets.InfoCardButton(rect.x + 5f, rect.y + (rect.height - 24f) / 2f, product.product));
                         list.Add(productOption);
                     }
                     Find.WindowStack.Add(new FloatMenu(list));
@@ -517,6 +539,22 @@ namespace CelesFeature
                     }
                 };
             }
+            yield return new Command_Action
+            {
+                defaultLabel = (active ? "Celes_Keyed_Active".Translate() : "Celes_Keyed_Inactive".Translate()),
+                icon = (active ? TexCommand.ForbidOff : TexCommand.ForbidOn),
+                action = delegate ()
+                {
+                    if (active)
+                    {
+                        active = false;
+                    }
+                    else
+                    {
+                        active = true;
+                    }
+                }
+            };
             yield break;
         }
 

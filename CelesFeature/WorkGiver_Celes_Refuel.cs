@@ -3,12 +3,16 @@ using Verse.AI;
 using Verse;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 namespace CelesFeature
 {
     public class WorkGiver_Celes_Refuel : WorkGiver_Scanner
     {
-        public override ThingRequest PotentialWorkThingRequest => ThingRequest.ForGroup(ThingRequestGroup.Refuelable);
+        public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
+        {
+            return pawn.Map.spawnedThings.ToList().FindAll(x => x.TryGetComp<Comp_Celes_Refuelable>() != null && x.TryGetComp<Comp_Celes_Refuelable>().ShouldAutoRefuelNow);
+        }
 
         public override PathEndMode PathEndMode => PathEndMode.Touch;
 

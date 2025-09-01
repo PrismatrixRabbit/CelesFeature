@@ -15,7 +15,7 @@ namespace CelesFeature
         {
             if (recipe.recipeUsers != null)
             {
-                if (recipe.recipeUsers.ContainsAny((ThingDef t) => t.GetType() == typeof(Celes_Building_AutomaticIndustry)))
+                if (recipe.recipeUsers.ContainsAny((ThingDef t) => t.thingClass.FullName.Contains("Celes_Building_AutomaticIndustry")))
                 {
                     __result = new Celes_Bill_AutomaticIndustry(recipe, precept);
                     return false;
@@ -58,7 +58,7 @@ namespace CelesFeature
                     case FormingState.Forming:
                         return "Celes_Keyed_ProductionCycle_Manufacturing".Translate();
                     case FormingState.Formed:
-                        return "";
+                        return "Celes_Keyed_ProductionCycle_Manufactured".Translate();
                 }
 
                 return null;
@@ -153,6 +153,10 @@ namespace CelesFeature
 
             if (WorkTable.ActiveBill != null)
             {
+                if (WorkTable.ActiveBill.State == FormingState.Formed)
+                {
+                    return true;
+                }
                 if (WorkTable.ActiveBill.State != 0)
                 {
                     return false;
@@ -243,7 +247,10 @@ namespace CelesFeature
                 {
                     state = FormingState.Formed;
                     WorkTable.Notify_FormingCompleted();
-                    Notify_IterationCompleted();
+                    if (WorkTable.compAutomaticIndustry.Props.autoEjectProducts)
+                    {
+                        Notify_IterationCompleted();
+                    }
                 }
                 else
                 {
@@ -276,19 +283,13 @@ namespace CelesFeature
                     break;
                 case FormingState.Preparing:
                     sb.AppendLine("Celes_Keyed_ProductionCycle_Producing".Translate(recipe.ProducedThingDef.LabelCap));
-                    sb.AppendLine("Celes_Keyed_CurrentProductionCycle".Translate() + ": " + ((int)(formingTicks * 1f)).ToStringTicksToPeriod());
                     sb.AppendLine(string.Concat(string.Concat("Celes_Keyed_RemainingProcessingCycles".Translate() + ": ", (recipe.gestationCycles - processingCycles).ToString(), " (") + "OfLower".Translate() + " ", recipe.gestationCycles.ToString(), ")"));
                     break;
                 case FormingState.Forming:
                     sb.AppendLine("Celes_Keyed_ProductionCycle_Producing".Translate(recipe.ProducedThingDef.LabelCap));
-                    sb.AppendLine("Celes_Keyed_CurrentProductionCycle".Translate() + ": " + ((int)(formingTicks * 1f)).ToStringTicksToPeriod());
                     break;
                 case FormingState.Formed:
                     break;
-            }
-            if (State == FormingState.Forming || State == FormingState.Preparing)
-            {
-                sb.AppendTagged("FinishesIn".Translate() + ": " + ((int)formingTicks).ToStringTicksToPeriod());
             }
 
             if (State == FormingState.Formed)

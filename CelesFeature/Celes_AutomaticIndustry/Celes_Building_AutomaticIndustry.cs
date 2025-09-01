@@ -16,6 +16,7 @@ namespace CelesFeature
         public Comp_Celes_Terminal compTerminal;
         public Comp_Celes_AutomaticIndustry compAutomaticIndustry;
         public Building_Celes_Core core;
+        public Comp_Celes_Linker compLinker;
 
         public Celes_Bill_AutomaticIndustry activeBill;
         public ThingOwner innerContainer;
@@ -36,6 +37,7 @@ namespace CelesFeature
             compConsumptionFactors = GetComp<Comp_Celes_ConsumptionFactors>();
             compTerminal = GetComp<Comp_Celes_Terminal>();
             compAutomaticIndustry = GetComp<Comp_Celes_AutomaticIndustry>();
+            compLinker = GetComp<Comp_Celes_Linker>();
         }
 
         public Celes_Bill_AutomaticIndustry ActiveBill
@@ -100,7 +102,6 @@ namespace CelesFeature
             if (compAutomaticIndustry.Props.autoEjectProducts)
             {
                 EjectContents();
-                activeBill.Reset();
             }
         }
 
@@ -153,20 +154,28 @@ namespace CelesFeature
         }
         public float GetEfficiency()
         {
+            float num = 0;
+            if (compLinker != null && compLinker.ModifierList.Count > 0)
+            {
+                foreach (Comp_Celes_ModifierLinker comp in compLinker.ModifierList)
+                {
+                    num += comp.Props.extraTerminalEfficiency;
+                }
+            }
             if (GetCore() != null)
             {
                 if (GetCore().IsActive())
                 {
-                    return GetCore().GetCoreEfficiency();
+                    return GetCore().GetCoreEfficiency() + num;
                 }
                 else
                 {
-                    return compTerminal.Props.efficiencyWithoutCore;
+                    return compTerminal.Props.efficiencyWithoutCore + num;
                 }
             }
             else
             {
-                return compTerminal.Props.efficiencyWithoutCore;
+                return compTerminal.Props.efficiencyWithoutCore + num;
             }
         }
 
@@ -232,15 +241,18 @@ namespace CelesFeature
                 activeBill.AppendInspectionData(stringBuilder);
             }
 
+            string text1 = "Celes_Keyed_CurrentEfficiency".Translate(GetEfficiency().ToStringPercent());
+            stringBuilder.AppendLine(text1);
+
             if (core != null)
             {
-                string text = "Celes_Keyed_ConnectedToCore".Translate();
-                stringBuilder.AppendLine(text);
+                string text2 = "Celes_Keyed_ConnectedToCore".Translate();
+                stringBuilder.AppendLine(text2);
             }
             else
             {
-                string text = "Celes_Keyed_NoCoreConnected".Translate();
-                stringBuilder.AppendLine(text);
+                string text2 = "Celes_Keyed_NoCoreConnected".Translate();
+                stringBuilder.AppendLine(text2);
             }
 
             return stringBuilder.ToString().TrimEndNewlines();
@@ -253,7 +265,7 @@ namespace CelesFeature
                 return null;
             }
 
-            return string.Format("{0}: {1}", "Celes_Keyed_ProductionCycle_Timeleft".Translate(), Mathf.CeilToInt(bill_Mech.formingTicks * 1f).ToStringTicksToPeriod());
+            return string.Format("{0}: {1}", "Celes_Keyed_ProductionCycle_Timeleft".Translate(), Mathf.CeilToInt(bill_Mech.formingTicks / GetEfficiency()).ToStringTicksToPeriod());
         }
 
         public override IEnumerable<Gizmo> GetGizmos()

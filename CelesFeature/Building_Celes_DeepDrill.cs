@@ -16,7 +16,21 @@ namespace CelesFeature
         public float yieldPct = 0f;
         public bool active = false;
 
-        public float ProgressToNextPortionPercent => progress / 10000f;
+        public float ProgressToNextPortionPercent
+        {
+            get
+            {
+                if (chosenMode == 0)
+                {
+                    return progress / compDeepDrill.Props.drillingWorkAmount;
+                }
+                if (chosenMode == 1)
+                {
+                    return progress / compDeepDrill.Props.processingModeRecipes[chosenProcessingModeProduct].workAmount;
+                }
+                return 0;
+            }
+        }
 
         public override void ExposeData()
         {

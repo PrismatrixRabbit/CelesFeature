@@ -187,22 +187,32 @@ namespace CelesFeature
             };
             yield return new Command_Action
             {
-                defaultLabel = "Celes_Keyed_ChangeMode".Translate() + (chosenMode == 0 ? "Celes_Keyed_DrillingMode".Translate() : "Celes_Keyed_ProcessingMode".Translate()),
-                icon = this.def.uiIcon,
-                action = delegate ()
+                defaultLabel = "Celes_Keyed_ChangeMode".Translate() + ((chosenMode == 0) ? "Celes_Keyed_DrillingMode".Translate() : "Celes_Keyed_ProcessingMode".Translate()),
+                icon = def.uiIcon,
+                action = delegate
                 {
-                    List<FloatMenuOption> list = new List<FloatMenuOption>();
-                    FloatMenuOption drillingMode = new FloatMenuOption("Celes_Keyed_DrillingMode".Translate(), delegate
+                    List<FloatMenuOption> list2 = new List<FloatMenuOption>();
+                    FloatMenuOption item2 = new FloatMenuOption("Celes_Keyed_DrillingMode".Translate(), delegate
                     {
-                        this.chosenMode = 0;
+                        Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("Celes_Keyed_ConfirmChangeMode".Translate(), delegate
+                        {
+                            chosenMode = 0;
+                            progress = 0f;
+                            yieldPct = 0f;
+                        }, destructive: true));
                     });
-                    list.Add(drillingMode);
-                    FloatMenuOption transformingMode = new FloatMenuOption("Celes_Keyed_ProcessingMode".Translate(), delegate
+                    list2.Add(item2);
+                    FloatMenuOption item3 = new FloatMenuOption("Celes_Keyed_ProcessingMode".Translate(), delegate
                     {
-                        this.chosenMode = 1;
+                        Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation("Celes_Keyed_ConfirmChangeMode".Translate(), delegate
+                        {
+                            chosenMode = 1;
+                            progress = 0f;
+                            yieldPct = 0f;
+                        }, destructive: true));
                     });
-                    list.Add(transformingMode);
-                    Find.WindowStack.Add(new FloatMenu(list));
+                    list2.Add(item3);
+                    Find.WindowStack.Add(new FloatMenu(list2));
                 }
             };
             if (chosenMode == 1)

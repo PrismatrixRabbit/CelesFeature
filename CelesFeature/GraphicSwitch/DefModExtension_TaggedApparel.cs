@@ -7,8 +7,7 @@ using Verse;
 
 namespace CelesFeature
 {
-    public class ModExtension_Aid : DefModExtension
+    public class DefModExtension_TaggedApparel : DefModExtension
     {
-        public Dictionary<IntRange, string> greetWords = new Dictionary<IntRange, string>();
     }
 }

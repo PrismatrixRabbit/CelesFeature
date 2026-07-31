@@ -14,5 +14,6 @@ namespace CelesFeature
         public static HediffDef WoundInfection;
         public static HediffDef Flu;
         public static HediffDef CelesSleepMechlinkImplant;
+        public static HediffDef Celes_MultiVerbSelect;
     }
 }

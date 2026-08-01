@@ -21,7 +21,6 @@ namespace CelesFeature
         [HarmonyPostfix]
         public static void Postfix(Pawn pawn, Hediff_Injury injury, DamageInfo dinfo, DamageWorker.DamageResult result)
         {
-            Harmony.DEBUG = true;
             if(pawn==null || pawn.Dead)
             {
                 return;

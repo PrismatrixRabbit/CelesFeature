@@ -9,81 +9,25 @@ using Verse.Sound;
 namespace CelesFeature
 {
 	[StaticConstructorOnStartup]
-	public class  CelesArtilleryStrike : Bombardment
+	public class CelesArtilleryStrike : Bombardment
 	{
-		public class  CelesArtilleryStrikeProjectile : IExposable
+		// 不再用 new 遮蔽基类字段,而是直接使用 Bombardment 的公共字段并在构造函数里赋值。
+		// 这样基类 StartStrike/ExposeData 读写的是同一份数值,存档不会出现重复键。
+		public CelesArtilleryStrike()
 		{
-			private int lifeTime;
-
-			private int maxLifeTime;
-
-			public IntVec3 targetCell;
-
-			private const float StartZ = 60f;
-
-			private const float Scale = 2.5f;
-
-			private const float Angle = 180f;
-
-			public int LifeTime => lifeTime;
-
-			public  CelesArtilleryStrikeProjectile()
-			{
-			}
-
-			public  CelesArtilleryStrikeProjectile(int lifeTime, IntVec3 targetCell)
-			{
-				this.lifeTime = lifeTime;
-				maxLifeTime = lifeTime;
-				this.targetCell = targetCell;
-			}
-
-			public void Tick()
-			{
-				lifeTime--;
-			}
-
-			public void Draw(Material material)
-			{
-				if (lifeTime > 0)
-				{
-					Vector3 pos = targetCell.ToVector3() +
-					              Vector3.forward * Mathf.Lerp(60f, 0f, 1f - (float)lifeTime / (float)maxLifeTime);
-					pos.z += 1.25f;
-					pos.y = AltitudeLayer.MoteOverhead.AltitudeFor();
-					Matrix4x4 matrix = default(Matrix4x4);
-					matrix.SetTRS(pos, Quaternion.Euler(0f, 180f, 0f), new Vector3(2.5f, 1f, 2.5f));
-					Graphics.DrawMesh(MeshPool.plane10, matrix, material, 0);
-				}
-			}
-
-			public void ExposeData()
-			{
-				Scribe_Values.Look(ref lifeTime, "lifeTime", 0);
-				Scribe_Values.Look(ref maxLifeTime, "maxLifeTime", 0);
-				Scribe_Values.Look(ref targetCell, "targetCell");
-			}
+			impactAreaRadius = 15f;
+			explosionRadiusRange = new FloatRange(4f, 6f);
+			randomFireRadius = 10;
+			bombIntervalTicks = 10;
+			warmupTicks = 60;
+			explosionCount = 100;
 		}
-
-		public new float impactAreaRadius = 15f;
-
-		public new FloatRange explosionRadiusRange = new FloatRange(4f, 6f);
-
-		public new int randomFireRadius = 10;
-
-		public new int bombIntervalTicks = 10;
-
-		public new int warmupTicks = 60;
-
-		public new int explosionCount = 100;
 
 		private int ticksToNextEffect;
 
 		private IntVec3 nextExplosionCell = IntVec3.Invalid;
 
 		private List<BombardmentProjectile> projectiles = new List<BombardmentProjectile>();
-
-		public  new const int EffectiveAreaRadius = 23;
 
 		private const int StartRandomFireEveryTicks = 20;
 
@@ -92,12 +36,6 @@ namespace CelesFeature
 		private static readonly Material ProjectileMaterial =
 			MaterialPool.MatFrom("Things/Projectile/Bullet_Big", ShaderDatabase.Transparent, Color.black);
 
-		public new static readonly SimpleCurve DistanceChanceFactor = new SimpleCurve
-		{
-			new CurvePoint(0f, 1f),
-			new CurvePoint(1f, 0.1f)
-		};
-
 		public override void SpawnSetup(Map map, bool respawningAfterReload)
 		{
 			base.SpawnSetup(map, respawningAfterReload);
@@ -105,12 +43,6 @@ namespace CelesFeature
 			{
 				GetNextExplosionCell();
 			}
-		}
-
-		public override void StartStrike()
-		{
-			duration = bombIntervalTicks * explosionCount;
-			base.StartStrike();
 		}
 
 		protected override void Tick()
@@ -123,15 +55,24 @@ namespace CelesFeature
 			if (warmupTicks > 0)
 			{
 				warmupTicks--;
-				if (warmupTicks == 0)
+				if (warmupTicks <= 0)
 				{
 					StartStrike();
 				}
 			}
 			else
 			{
-				base.Tick();
-				if (Find.TickManager.TicksGame % 20 == 0 && base.TicksLeft > 0)
+				// 不能调用 base.Tick():那会执行整个原版 Bombardment.Tick(含它自身的 EffectTick/StartRandomFire),
+				// 造成双重轰炸。这里复刻 OrbitalStrike.Tick 的等价行为:驱动 comps 并在到期后销毁。
+				for (int i = 0; i < AllComps.Count; i++)
+				{
+					AllComps[i].CompTick();
+				}
+				if (TicksPassed >= duration)
+				{
+					Destroy();
+				}
+				if (base.TicksLeft > 0 && this.IsHashIntervalTick(StartRandomFireEveryTicks))
 				{
 					StartRandomFire();
 				}
@@ -152,7 +93,7 @@ namespace CelesFeature
 			if (ticksToNextEffect <= 0 && base.TicksLeft >= bombIntervalTicks)
 			{
 				SoundDefOf.Bombardment_PreImpact.PlayOneShot(new TargetInfo(nextExplosionCell, base.Map));
-				projectiles.Add(new BombardmentProjectile(60, nextExplosionCell));
+				projectiles.Add(new BombardmentProjectile(EffectDuration, nextExplosionCell));
 				ticksToNextEffect = bombIntervalTicks;
 				GetNextExplosionCell();
 			}
@@ -167,8 +108,7 @@ namespace CelesFeature
 				}
 			}
 		}
-		
-	
+
 		private void TryDoExplosion(BombardmentProjectile proj)
 		{
 			List<Thing> list = base.Map.listerThings.ThingsInGroup(ThingRequestGroup.ProjectileInterceptor);
@@ -184,9 +124,9 @@ namespace CelesFeature
 				instigator, -10, -5f, null, projectile: def, weapon: weaponDef);
 		}
 
-		public void Draw()
+		protected override void DrawAt(Vector3 drawLoc, bool flip = false)
 		{
-			Comps_PostDraw();
+			base.DrawAt(drawLoc, flip);
 			if (!projectiles.NullOrEmpty())
 			{
 				for (int i = 0; i < projectiles.Count; i++)
@@ -211,7 +151,7 @@ namespace CelesFeature
 				}
 			}
 
-			FireUtility.TryStartFireIn(intVec, base.Map, Rand.Range(0.1f, 0.925f),instigator);
+			FireUtility.TryStartFireIn(intVec, base.Map, Rand.Range(0.1f, 0.925f), instigator);
 		}
 
 		private void GetNextExplosionCell()
@@ -225,14 +165,9 @@ namespace CelesFeature
 		public override void ExposeData()
 		{
 			base.ExposeData();
-			Scribe_Values.Look(ref impactAreaRadius, "impactAreaRadius", 15f);
-			Scribe_Values.Look(ref explosionRadiusRange, "explosionRadiusRange", new FloatRange(6f, 8f));
-			Scribe_Values.Look(ref randomFireRadius, "randomFireRadius", 25);
-			Scribe_Values.Look(ref bombIntervalTicks, "bombIntervalTicks", 18);
-			Scribe_Values.Look(ref warmupTicks, "warmupTicks", 0);
-			Scribe_Values.Look(ref ticksToNextEffect, "ticksToNextEffect", 0);
-			Scribe_Values.Look(ref nextExplosionCell, "nextExplosionCell");
-			Scribe_Collections.Look(ref projectiles, "projectiles", LookMode.Deep);
+			Scribe_Values.Look(ref ticksToNextEffect, "celesTicksToNextEffect", 0);
+			Scribe_Values.Look(ref nextExplosionCell, "celesNextExplosionCell");
+			Scribe_Collections.Look(ref projectiles, "celesProjectiles", LookMode.Deep);
 			if (Scribe.mode == LoadSaveMode.PostLoadInit)
 			{
 				if (!nextExplosionCell.IsValid)
@@ -246,7 +181,6 @@ namespace CelesFeature
 				}
 			}
 		}
-		
 	}
 
 	public class Verb_ArtilleryStrike : Verb_CastBase
@@ -256,12 +190,9 @@ namespace CelesFeature
 		{
 			public static ThingDef CelesArtilleryStrike;
 		}
-		
-		public const int DurationTicks = 1080;
-			
+
 		protected override bool TryCastShot()
 		{
-
 			if (currentTarget.HasThing && currentTarget.Thing.Map != caster.Map)
 			{
 				return false;
@@ -269,7 +200,6 @@ namespace CelesFeature
 
 			CelesArtilleryStrike obj = (CelesArtilleryStrike)GenSpawn.Spawn(CelesThingDefOf.CelesArtilleryStrike,
 				currentTarget.Cell, caster.Map);
-			obj.duration = 540;
 			obj.instigator = caster;
 			obj.weaponDef = ((base.EquipmentSource != null) ? base.EquipmentSource.def : null);
 			base.ReloadableCompSource?.UsedOnce();

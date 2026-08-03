@@ -10,7 +10,7 @@ namespace CelesFeature
 {
     
     [StaticConstructorOnStartup]
-    public class Celes_Comp_MutiFunctionalShield : ThingComp
+    public class Celes_Comp_MultiFunctionalShield : ThingComp
     {
 		protected float energy;
 		protected int ticksToReset = -1;
@@ -26,7 +26,7 @@ namespace CelesFeature
 		private int KeepDisplayingTicks = 1000;
 		private float ApparelScorePerEnergyMax = 0.25f;
 
-		public Celes_CompProperties_MutiFunctionalShield Props => (Celes_CompProperties_MutiFunctionalShield)props;
+		public Celes_CompProperties_MultiFunctionalShield Props => (Celes_CompProperties_MultiFunctionalShield)props;
 		private float EnergyMax => parent.GetStatValue(StatDefOf.EnergyShieldEnergyMax);
 		private float EnergyGainPerTick => parent.GetStatValue(StatDefOf.EnergyShieldRechargeRate) / 60f;
 		public float Energy => energy;
@@ -364,7 +364,7 @@ namespace CelesFeature
     [StaticConstructorOnStartup]
     public class Celes_Gizmo_MutiFunctionalShieldStatus : Gizmo
     {
-	    public Celes_Comp_MutiFunctionalShield shield;
+	    public Celes_Comp_MultiFunctionalShield shield;
 
 	    private static readonly Texture2D FullShieldBarTex = SolidColorMaterials.NewSolidColorTexture(new Color(0.2f, 0.2f, 0.24f));
 

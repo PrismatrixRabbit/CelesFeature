@@ -4,7 +4,7 @@ using Verse;
 namespace CelesFeature
 {
 
-    public class Celes_CompProperties_MutiFunctionalShield : CompProperties
+    public class Celes_CompProperties_MultiFunctionalShield : CompProperties
     {
         public float energyOnReset = 0.2f;
         public int startingTicksToReset = 3200;
@@ -19,9 +19,9 @@ namespace CelesFeature
 
         public bool blocksRangedWeapons = false;
         
-        public Celes_CompProperties_MutiFunctionalShield()
+        public Celes_CompProperties_MultiFunctionalShield()
         {
-            compClass = typeof(Celes_Comp_MutiFunctionalShield);
+            compClass = typeof(Celes_Comp_MultiFunctionalShield);
         }
     }
 }

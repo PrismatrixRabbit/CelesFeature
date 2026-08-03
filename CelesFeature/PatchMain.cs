@@ -1,10 +1,5 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using Verse;
 
 namespace CelesFeature
@@ -14,9 +9,8 @@ namespace CelesFeature
 	{
 		static PatchMain()
 		{
-			Harmony harmony = new Harmony("Celes_Patch");
+			Harmony harmony = new Harmony("CelesFeature");
 			harmony.PatchAll(Assembly.GetExecutingAssembly());
-			
 		}
 	}
 }

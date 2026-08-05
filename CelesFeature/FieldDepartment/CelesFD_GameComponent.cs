@@ -16,7 +16,8 @@ namespace CelesFeature
         public const int KeyToCreditDefault = 100; // 占位值
         
         // 新增字段（类成员区）：
-        public List<string> DialogueHistory = new List<string>();
+        public List<CelesFD_DialogueEntry> DialogueHistory = new List<CelesFD_DialogueEntry>();
+        public CelesFD_DialogueEngine DialogueEngine = new CelesFD_DialogueEngine();
         
         public CelesFD_GameComponent(Game game) { }
 
@@ -30,8 +31,21 @@ namespace CelesFeature
             Scribe_Values.Look(ref EffectiveLevelValue, "CFD_EffectiveLevelValue", 0);
             Scribe_Values.Look(ref TradeVolume, "CFD_TradeVolume", 0);
             Scribe_Values.Look(ref KeyToCredit, "CFD_KeyToCredit", KeyToCreditDefault);
-            Scribe_Collections.Look(ref DialogueHistory, "CFD_DialogueHistory", LookMode.Value);
-            if (DialogueHistory == null) DialogueHistory = new List<string>();
+            Scribe_Collections.Look(ref DialogueHistory, "CFD_DialogueHistory", LookMode.Deep);
+            if (DialogueHistory == null) DialogueHistory = new List<CelesFD_DialogueEntry>();
+            // 对话引擎持久化（D6）
+            var savedVars = DialogueEngine.ExportVariables();
+            Scribe_Collections.Look(ref savedVars, "CFD_DialogueVars", LookMode.Value, LookMode.Value);
+            Scribe_Values.Look(ref DialogueEngine.SavedGameNode, "CFD_SavedGameNode", null);
+            string savedTree = DialogueEngine.CurrentTreeName;
+            string savedNode = DialogueEngine.CurrentNodeName;
+            Scribe_Values.Look(ref savedTree, "CFD_CurrentTree", null);
+            Scribe_Values.Look(ref savedNode, "CFD_CurrentNode", null);
+            if (Scribe.mode == LoadSaveMode.ResolvingCrossRefs)
+            {
+                DialogueEngine.ImportVariables(savedVars);
+                DialogueEngine.RestoreState(savedTree, savedNode);
+            }
         }
 
         public override void StartedNewGame()
@@ -77,9 +91,9 @@ namespace CelesFeature
             }
         }
         
-        public void AddDialogue(string line)
+        public void AddDialogue(bool isPlayer, string text)
         {
-            DialogueHistory.Add(line);
+            DialogueHistory.Add(new CelesFD_DialogueEntry { IsPlayer = isPlayer, Text = text });
             if (DialogueHistory.Count > 300)
                 DialogueHistory.RemoveRange(0, DialogueHistory.Count - 300);
         }

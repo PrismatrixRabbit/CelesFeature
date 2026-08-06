@@ -156,20 +156,26 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             if (!startupDone) startupInterrupted = true;
         }
 
+        // 启动收尾（自然完成 / 切页打断两处触发共用此流程）：进入根树对话 + 启动跑马灯。
+        // interrupted=true：被切页打断，不插入 Greeting 占位消息；
+        // interrupted=false：自然完成，历史为空时插入启动第一条占位消息（CelesFD_Keyed_Greeting_Placeholder）。
+        private void FinishStartup(bool interrupted)
+        {
+            startupDone = true;
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            if (!interrupted && gc.DialogueHistory.Count == 0)
+                gc.AddDialogue(false, "CelesFD_Keyed_Greeting_Placeholder".Translate());
+            gc.DialogueEngine.StartRootTree();
+            StartTypingNodeText(gc.DialogueEngine);
+            StartTicker(Time.realtimeSinceStartup);
+        }
+
         public void Draw(Rect inRect)
         {
             float now = Time.realtimeSinceStartup;
             if (!startupDone && startupInterrupted)
-            {
-                startupDone = true;
-                CelesFD_DialogueEngine eng = CelesFD_GameComponent.Instance?.DialogueEngine;
-                if (eng != null)
-                {
-                    eng.StartRootTree();
-                    StartTypingNodeText(eng);
-                }
-                StartTicker(now);
-            }
+                FinishStartup(true);   // 切页打断启动：直接进入对话（不插入占位消息）
 
             Rect tickerBarRect = inRect.BottomPartPixels(TickerHeight);
             Rect restRect = inRect; restRect.yMax -= TickerHeight;
@@ -188,18 +194,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
                 DrawPortraitStartup(portraitRect, elapsed);
                 DrawBootText(textRect, elapsed);
                 if (elapsed >= StartupDuration)
-                {
-                    startupDone = true;
-                    CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
-                    if (gc != null && gc.DialogueHistory.Count == 0)
-                        gc.AddDialogue(false, "CelesFD_Keyed_Greeting_Placeholder".Translate());
-                    if (gc != null)
-                    {
-                        gc.DialogueEngine.StartRootTree();
-                        StartTypingNodeText(gc.DialogueEngine);
-                    }
-                    StartTicker(now);
-                }
+                    FinishStartup(false);   // 自然完成：插入占位消息后进入对话
             }
             else
             {
@@ -253,7 +248,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         
         private void DrawDialogueArea(Rect rect, float now)
         {
-            Widgets.DrawMenuSection(rect);
+            // 背景框由 Draw() 统一绘制（启动/完成阶段一致），此处不再重复画框
             if (dialogueState != DialogueState.AwaitingChoice) return;
 
             CelesFD_DialogueEngine engine = CelesFD_GameComponent.Instance?.DialogueEngine;
@@ -311,7 +306,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             CelesFD_DialogueEngine engine = gc.DialogueEngine;
             if (engine.CurrentTree != null && !engine.CurrentTree.isRoot && engine.CurrentNode != null)
                 engine.SavedGameNode = engine.CurrentNode.defName;   // 保存 game 进度
-            gc.AddDialogue(true, "CelesFD_Keyed_Test_Input".Translate());
+            gc.AddDialogue(true, "CelesFD_Keyed_Return_Record".Translate());
             engine.StartRootTree();           // 进入 root 树（已 GotoNode startNode）
             StartTypingNodeText(engine);      // 逐字根树 startNode 文本
         }
@@ -476,7 +471,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         private void AppendTicker(Rect rect, float now, float speed)
         {
             int idx = PickRandomTicker();
-            string text = tickerDef.welcomeTicker[idx].Translate();
+            string text = tickerDef.welcomeTicker[idx];   // 文本经 defInjected 翻译（见 CelesFD_TickerDef.welcomeTicker）
             Text.Font = GameFont.Small;
             float width = Text.CalcSize(text).x;
             tickerEntries.Add(new TickerEntry { Text = text, Width = width, EnterTime = now });

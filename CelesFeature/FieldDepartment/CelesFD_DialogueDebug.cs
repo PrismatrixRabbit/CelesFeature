@@ -60,6 +60,8 @@ namespace CelesFeature
                         Log.Error($"[CelesFD] Node {n.defName} option missing label");
                     if (o.enterTree.NullOrEmpty() && o.next.NullOrEmpty())
                         Log.Error($"[CelesFD] Node {n.defName} option '{o.label}' missing next");
+                    if (o.comps != null && o.failNode.NullOrEmpty())
+                        Log.Error($"[CelesFD] Node {n.defName} option '{o.label}' has comps but no failNode");
                     if (o.sets != null)
                         foreach (var s in o.sets)
                             if (s.varName.NullOrEmpty())
@@ -73,27 +75,27 @@ namespace CelesFeature
             var engine = new CelesFD_DialogueEngine();
             // Set weapon=1 → Equal 1 满足 / Gte 2 不满足
             engine.ApplyOperations(new List<CelesFD_VarOperationDef>
-                { new CelesFD_VarOperationDef { varName = "weapon", value = 1f, op = CelesFD_VarOp.Set } });
+                { new CelesFD_VarOperationDef { varName = "weapon", Set = 1f } });
             bool eqTrue = engine.CheckConditions(new List<CelesFD_VarOperationDef>
-             { new CelesFD_VarOperationDef { varName = "weapon", value = 1f, comparison = CelesFD_VarCompare.Equal } });
+             { new CelesFD_VarOperationDef { varName = "weapon", Equal = 1f } });
             bool gteFalse = engine.CheckConditions(new List<CelesFD_VarOperationDef>
-                { new CelesFD_VarOperationDef { varName = "weapon", value = 2f, comparison = CelesFD_VarCompare.GreaterOrEqual } });
+                { new CelesFD_VarOperationDef { varName = "weapon", Gte = 2f } });
             // Add +1 → 2 → Gte 2 满足
             engine.ApplyOperations(new List<CelesFD_VarOperationDef>
-                { new CelesFD_VarOperationDef { varName = "weapon", value = 1f, op = CelesFD_VarOp.Add } });
+                { new CelesFD_VarOperationDef { varName = "weapon", Add = 1f } });
             bool gteTrue = engine.CheckConditions(new List<CelesFD_VarOperationDef>
-                { new CelesFD_VarOperationDef { varName = "weapon", value = 2f, comparison = CelesFD_VarCompare.GreaterOrEqual } });
+                { new CelesFD_VarOperationDef { varName = "weapon", Gte = 2f } });
             // Set 0 → 移除（HasVariable 应为 false，GetVariable 判 0）
             engine.ApplyOperations(new List<CelesFD_VarOperationDef>
-                { new CelesFD_VarOperationDef { varName = "weapon", value = 0f, op = CelesFD_VarOp.Set } });
+                { new CelesFD_VarOperationDef { varName = "weapon", Set = 0f } });
             bool removed = !engine.HasVariable("weapon");
             float afterZero = engine.GetVariable("weapon");
             // AND 组合
             engine.SetVariable("fuel", 1f);
             bool andTrue = engine.CheckConditions(new List<CelesFD_VarOperationDef>
             {
-                new CelesFD_VarOperationDef { varName = "weapon", value = 0f, comparison = CelesFD_VarCompare.Equal },   // weapon 已移除 → 判 0
-                new CelesFD_VarOperationDef { varName = "fuel", value = 1f, comparison = CelesFD_VarCompare.Equal }
+                new CelesFD_VarOperationDef { varName = "weapon", Equal = 0f },   // weapon 已移除 → 判 0
+                new CelesFD_VarOperationDef { varName = "fuel", Equal = 1f }
             });
             // Reset → 清空，GetVariable 判 0
             engine.ResetAllVariables();

@@ -16,6 +16,7 @@ namespace CelesFeature
         private readonly List<CelesFD_IPage> pages = new List<CelesFD_IPage>();
         private int curTabIndex;
         private Vector2 tabScrollPos;
+        private Vector2 overviewScrollPos;   // ② 重构：左上概览区滚动（动态内容高度）
 
         public override Vector2 InitialSize
         {
@@ -52,7 +53,10 @@ namespace CelesFeature
             Rect mainRect     = new Rect(0f, h * 0.3f, w, h * 0.7f);         // ⑤ 主页面（100%W）
 
             DrawOverviewPanel(overviewRect.ContractedBy(RegionSpacing));
-            DrawEmptySubPage(topRect.ContractedBy(RegionSpacing));
+            if (pages[curTabIndex] is CelesFD_ISubPage sp)
+                sp.DrawSubPage(topRect.ContractedBy(RegionSpacing));
+            else
+                DrawEmptySubPage(topRect.ContractedBy(RegionSpacing));   // 武备/任务页回退（零改动）
             DrawTabButtons(tabRect.ContractedBy(RegionSpacing));
 
             Rect mainContentRect = mainRect.ContractedBy(RegionSpacing);
@@ -76,16 +80,64 @@ namespace CelesFeature
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             if (gc == null) return;
 
-            float curY = rect.y + 8f;
-            Widgets.Label(new Rect(rect.x + 8f, curY, rect.width - 16f, OverviewLineHeight), "CelesFD_Keyed_Level".Translate(gc.UnlockLevelValue));
+            // ② 重构：概览区滚动（内容坐标；距下一级行动态高度——超高触发滚动条防遮挡）
+            float contentH = 5 * (OverviewLineHeight + 2f) + 48f + 8f;
+            Widgets.BeginScrollView(rect.ContractedBy(4f), ref overviewScrollPos, new Rect(0f, 0f, rect.width - 24f, contentH));
+            float curY = 8f;
+            float textW = rect.width - 32f;
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Level".Translate(gc.GetEffectiveLevel()));   // 显示等级 = 有效等级（v4.7）
             curY += OverviewLineHeight + 2f;
-            Widgets.Label(new Rect(rect.x + 8f, curY, rect.width - 16f, OverviewLineHeight), "CelesFD_Keyed_Fame".Translate(gc.Fame));
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Fame".Translate(gc.Fame));
             curY += OverviewLineHeight + 2f;
-            Widgets.Label(new Rect(rect.x + 8f, curY, rect.width - 16f, OverviewLineHeight), "CelesFD_Keyed_Credit".Translate(gc.Credit));
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Credit".Translate(gc.Credit));
             curY += OverviewLineHeight + 2f;
-            Widgets.Label(new Rect(rect.x + 8f, curY, rect.width - 16f, OverviewLineHeight), "CelesFD_Keyed_QuantumKey".Translate(gc.QuantumKey));
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_QuantumKey".Translate(gc.QuantumKey));
             curY += OverviewLineHeight + 2f;
-            Widgets.Label(new Rect(rect.x + 8f, curY, rect.width - 16f, OverviewLineHeight), "CelesFD_Keyed_TradeVolume".Translate(gc.TradeVolume));
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_TradeVolume".Translate(gc.TradeVolume));
+            curY += OverviewLineHeight + 2f;
+            DrawNextLevelLine(curY, textW);
+            Widgets.EndScrollView();
+        }
+
+        // M2（v4.7）：距下一级所需声望/交易额；欠款（Credit<0）替换"请还款"；最高级显示已达最高
+        // ② 重构：内容坐标（概览滚动区内）；WordWrap + 动态高度换行适配
+        private void DrawNextLevelLine(float curY, float width)
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            string text;
+            if (gc.Credit < 0)
+            {
+                text = "CelesFD_Keyed_NextLevelDebt".Translate();
+            }
+            else
+            {
+                CelesFD_UnlockLevelConfigDef config = CelesFD_DefOf.CelesFD_UnlockLevelConfigDefault;
+                int nextIndex = gc.UnlockLevelValue + 1;
+                if (config == null || config.unlockLevel == null || nextIndex >= config.unlockLevel.Count)
+                {
+                    text = "CelesFD_Keyed_NextLevelMax".Translate();
+                }
+                else
+                {
+                    CelesFD_UnlockLevelDef next = DefDatabase<CelesFD_UnlockLevelDef>.GetNamedSilentFail(config.unlockLevel[nextIndex]);
+                    if (next == null)
+                    {
+                        text = "CelesFD_Keyed_NextLevelMax".Translate();
+                    }
+                    else
+                    {
+                        int fameNeed = Mathf.Max(0, next.fameRequire - gc.Fame);
+                        int tradeNeed = Mathf.Max(0, next.tradeRequire - gc.TradeVolume);
+                        text = "CelesFD_Keyed_NextLevel".Translate(fameNeed, tradeNeed);
+                    }
+                }
+            }
+            bool prevWrap = Text.WordWrap;
+            Text.WordWrap = true;
+            float h = Text.CalcHeight(text, width);
+            Widgets.Label(new Rect(8f, curY, width, h), text);
+            Text.WordWrap = prevWrap;
         }
 
         private void DrawEmptySubPage(Rect rect)

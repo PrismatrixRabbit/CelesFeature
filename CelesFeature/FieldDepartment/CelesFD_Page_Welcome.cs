@@ -6,7 +6,7 @@ using Verse;
 
 namespace CelesFeature
 {
-    public class CelesFD_Page_Welcome : CelesFD_IPage
+    public class CelesFD_Page_Welcome : CelesFD_IPage, CelesFD_ISubPage
     {
         private const float StartupDuration = 9f;
         private const int ProgressBarCells = 18;
@@ -156,6 +156,32 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             if (!startupDone) startupInterrupted = true;
         }
 
+        // 正上子页：本季度要闻（M0；每象随市场刷新重随机由 M2 刷新点调用 RefreshNews）
+        public void DrawSubPage(Rect rect)
+        {
+            Widgets.DrawMenuSection(rect);
+            if (!startupDone) return;   // 启动动画（9s 启动字）期间不显示要闻（裁决 D3）
+
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            CelesFD_SubPageDef newsDef = CelesFD_DefOf.CelesFD_SubPageWelcome;
+            if (newsDef == null || newsDef.newsPool.NullOrEmpty()) return;
+
+            if (gc.CurrentNewsIndex < 0)
+                gc.RefreshNews();   // 懒初始化（读档保留 index，不重随机）
+
+            int idx = Mathf.Clamp(gc.CurrentNewsIndex, 0, newsDef.newsPool.Count - 1);
+            string news = newsDef.newsPool[idx];
+
+            Rect inner = rect.ContractedBy(10f);
+            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 24f), "CelesFD_Keyed_QuarterlyNews".Translate());
+            Rect textRect = new Rect(inner.x, inner.y + 26f, inner.width, inner.height - 26f);
+            bool prevWrap = Text.WordWrap;
+            Text.WordWrap = true;
+            GUI.Label(textRect, news, Text.CurFontStyle);   // 多行渲染（仿 DrawDialogueArea）
+            Text.WordWrap = prevWrap;
+        }
+
         // 启动收尾（自然完成 / 切页打断两处触发共用此流程）：进入根树对话 + 启动跑马灯。
         // interrupted=true：被切页打断，不插入 Greeting 占位消息；
         // interrupted=false：自然完成，历史为空时插入启动第一条占位消息（CelesFD_Keyed_Greeting_Placeholder）。
@@ -290,7 +316,18 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         private void OnOptionPicked(CelesFD_DialogueEngine engine, CelesFD_ResolvedOption o)
         {
             CelesFD_GameComponent.Instance.AddDialogue(true, engine.ResolveRecordText(o));
-            engine.ApplyOption(o);
+            if (!engine.ApplyOption(o))
+            {
+                // 动作失败：跳 failNode（带 comps 选项已校验必填；未设时 Log.Error + 停留原节点）
+                if (o.FailNode.NullOrEmpty())
+                    Log.Error($"[CelesFD] Option '{o.Label}' failed but has no failNode");
+                else
+                {
+                    engine.GotoNode(o.FailNode);
+                    StartTypingNodeText(engine);
+                }
+                return;
+            }
             Log.Message($"[CelesFD] Pick '{o.Label}' → next '{(o.EnterTree.NullOrEmpty() ? o.Next : o.EnterTree)}'");
             if (!o.EnterTree.NullOrEmpty())
                 engine.EnterTree(o.EnterTree);   // 跨树进入：恢复进度或从 startNode 开始
@@ -313,7 +350,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
 
         private void StartTypingNodeText(CelesFD_DialogueEngine engine)
         {
-            replyText = engine.CurrentNode.nodeText;
+            replyText = engine.ResolveNodeText(engine.CurrentNode.nodeText);   // {varName} 插值
             replyShownChars = 0;
             replyCharAccum = 0f;
             replyStartTime = Time.realtimeSinceStartup;
@@ -334,7 +371,8 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             for (int i = 0; i < ProgressBarCells; i++)
                 bar += (i < filled) ? "█" : "░";
             Text.Font = GameFont.Small;
-            Widgets.Label(new Rect(inner.x, inner.yMax - 20f, inner.width, 20f), bar);
+            float barH = Text.LineHeightOf(GameFont.Small);   // 原版实测行高缓存（修复 2026-08-15：固定 20f 与行高贴线）
+            Widgets.Label(new Rect(inner.x, inner.yMax - barH, inner.width, barH), bar);
             GUI.color = Color.white;
         }
 
@@ -482,7 +520,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
 
         private void StartTicker(float now)
         {
-            tickerDef = DefDatabase<CelesFD_TickerDef>.GetNamed("CelesFD_TickerDefault");
+            tickerDef = CelesFD_DefOf.CelesFD_TickerDefault;
             tickerEntries.Clear();
             lastTicker1 = -1;
             lastTicker2 = -1;

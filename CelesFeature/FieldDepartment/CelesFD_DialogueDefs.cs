@@ -3,15 +3,14 @@ using Verse;
 
 namespace CelesFeature
 {
-    public enum CelesFD_VarOp { Set, Add }
-    public enum CelesFD_VarCompare { Equal, GreaterOrEqual }
-
+    // 变量操作/条件：元素名=操作，值=数量（Equal/Gte 用于 conditions；Set/Add 用于 sets；Add 负值=减）
     public class CelesFD_VarOperationDef
     {
         public string varName;
-        public float value;
-        public CelesFD_VarOp op;                // Set / Add（Add 负值=减）
-        public CelesFD_VarCompare comparison;   // 条件专用：Equal / GreaterOrEqual
+        public float? Equal;   // 条件：var == value
+        public float? Gte;     // 条件：var >= value
+        public float? Set;     // 操作：var = value
+        public float? Add;     // 操作：var += value（Add 负值=减）
     }
 
     public class CelesFD_DialogueBranchDef
@@ -33,12 +32,15 @@ namespace CelesFeature
         public string recordText;
         public string next;
         public string enterTree;                // 跨树进入：非空时忽略 next，进树后恢复进度或从 startNode 开始
+        public string failNode;                 // 必填（带 comps 时）：动作失败跳转节点
+        public List<CelesFD_DialogueActionCompProperties> comps;   // 动作副作用（任一失败即失败，跳 failNode）
         public List<CelesFD_VarOperationDef> sets;
     }
 
     public class CelesFD_DialogueNodeDef : Def
     {
-        public string nodeText;                 // 节点文本（defInjected 翻译）
+        public string nodeText;                 // 节点文本（支持 {varName} 插值；defInjected 翻译）
+        public List<CelesFD_DialogueActionCompProperties> entryComps;   // 进入节点时执行（刷新变量 / 注入动态选项）
         public List<CelesFD_DialogueOptionDef> options;
     }
 

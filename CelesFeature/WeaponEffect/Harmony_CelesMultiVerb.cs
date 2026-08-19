@@ -32,9 +32,11 @@ namespace CelesFeature
         static Harmony_CelesMultiVerb()
         {
             Harmony harmony = new Harmony("CelesFeature.MultiVerb");
+            // 2026-08-15 鲁棒性修正：Transpiler → Prefix——Transpiler 修改 IL 使其他 Mod 的 Transpiler 基础改变（多 Mod 顺序组合必然敏感）；
+            //   Prefix 不碰 IL，其他 Mod 的 Transpiler/Postfix 不受影响（多 Prefix 短路链敏感度远低于 IL 组合）
             harmony.Patch(
                 AccessTools.PropertyGetter(typeof(VerbTracker), nameof(VerbTracker.PrimaryVerb)),
-                transpiler: new HarmonyMethod(typeof(Harmony_CelesMultiVerb), nameof(Transpiler_PrimaryVerb))
+                prefix: new HarmonyMethod(typeof(Harmony_CelesMultiVerb), nameof(Prefix_PrimaryVerb))
             );
             // [事实] 1D: Postfix ThingDef.SpecialDisplayStats
             harmony.Patch(
@@ -48,26 +50,13 @@ namespace CelesFeature
                 postfix: new HarmonyMethod(typeof(Harmony_CelesMultiVerb), nameof(Postfix_CreateVerbTargetCommand))
             );
         }
-        public static IEnumerable<CodeInstruction> Transpiler_PrimaryVerb(
-            IEnumerable<CodeInstruction> instructions, ILGenerator il)
+        // Prefix 短路（2026-08-15 替代 Transpiler）：多武器时返回我们指定的 verb，否则走原 getter
+        public static bool Prefix_PrimaryVerb(VerbTracker __instance, ref Verb __result)
         {
-            var helperMethod = AccessTools.Method(
-                typeof(Harmony_CelesMultiVerb), nameof(GetMultiVerbPrimaryVerb));
-            var tempLocal = il.DeclareLocal(typeof(Verb));
-            var skipLabel = il.DefineLabel();
-            var list = new List<CodeInstruction>(instructions);
-            list.InsertRange(0, new[]
-            {
-                new CodeInstruction(OpCodes.Ldarg_0),
-                new CodeInstruction(OpCodes.Call, helperMethod),
-                new CodeInstruction(OpCodes.Stloc_S, tempLocal),
-                new CodeInstruction(OpCodes.Ldloc_S, tempLocal),
-                new CodeInstruction(OpCodes.Brfalse_S, skipLabel),
-                new CodeInstruction(OpCodes.Ldloc_S, tempLocal),
-                new CodeInstruction(OpCodes.Ret),
-            });
-            list[7].labels.Add(skipLabel);
-            return list;
+            Verb verb = GetMultiVerbPrimaryVerb(__instance);
+            if (verb == null) return true;   // 走原逻辑
+            __result = verb;
+            return false;
         }
         private static Verb GetMultiVerbPrimaryVerb(VerbTracker tracker)
         {

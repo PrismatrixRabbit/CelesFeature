@@ -37,7 +37,7 @@ namespace CelesFeature
             }
             yield return new FloatMenuOption("CelesFD_Keyed_OpenComms".Translate(), delegate
             {
-                Job job = JobMaker.MakeJob(DefDatabase<JobDef>.GetNamed("CelesFD_UseAntenna"), this);
+                Job job = JobMaker.MakeJob(CelesFD_DefOf.CelesFD_UseAntenna, this);
                 myPawn.jobs.TryTakeOrderedJob(job, JobTag.Misc);
             });
         }

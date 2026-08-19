@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using LudeonTK;
+using RimWorld;
+using RimWorld.Planet;
 using Verse;
 
 namespace CelesFeature
@@ -88,6 +91,31 @@ namespace CelesFeature
                 string target = o.EnterTree.NullOrEmpty() ? o.Next : "TREE:" + o.EnterTree;
                 Log.Message($"[CelesFD]   [{kind}] '{o.Label}' → {target}");
             }
+        }
+
+        // 选点器验证：近/远点输出距离分布（正态验证），随机输出成功率
+        [DebugAction("CelesFD", "Test tile selector")]
+        private static void DevTestTileSelector()
+        {
+            Faction beacon = Find.FactionManager.AllFactionsListForReading.FirstOrDefault(f => f.def == CelesFD_DefOf.Celes_BeaconFaction);
+            Log.Message($"[CelesFD] TileSelector beacon: {(beacon != null ? beacon.Name : "NULL")}   worldFactions={Find.World.info.factions?.Count ?? -1}");
+            var near = new List<int>();
+            var far = new List<int>();
+            int rndOk = 0;
+            for (int i = 0; i < 20; i++)
+            {
+                if (CelesFD_TileSelector.TryFindNearTile(out var nt)
+                    && TileFinder.TryFindRandomPlayerTile(out var root0, allowCaravans: false, validator: null, canBeSpace: false))
+                    near.Add(Find.WorldGrid.TraversalDistanceBetween(root0, nt));
+                if (CelesFD_TileSelector.TryFindFarTile(out var ft)
+                    && TileFinder.TryFindRandomPlayerTile(out var root1, allowCaravans: false, validator: null, canBeSpace: false))
+                    far.Add(Find.WorldGrid.TraversalDistanceBetween(root1, ft));
+                if (beacon != null && CelesFD_TileSelector.TryFindRandomTile(out var rt, beacon))
+                    rndOk++;
+            }
+            Log.Message($"[CelesFD] TileSelector Near dists(20): {string.Join(",", near)}");
+            Log.Message($"[CelesFD] TileSelector Far  dists(20): {string.Join(",", far)}");
+            Log.Message($"[CelesFD] TileSelector Random success: {rndOk}/20");
         }
     }
 }

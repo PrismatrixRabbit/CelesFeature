@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Verse;
 
 namespace CelesFeature
@@ -6,6 +7,8 @@ namespace CelesFeature
     public class CelesFD_DialogueEngine
     {
         private readonly Dictionary<string, float> variables = new Dictionary<string, float>();
+        private readonly Dictionary<string, string> stringVariables = new Dictionary<string, string>();   // string 变量（插值用，如 beaconTargetName，不持久化）
+        private readonly List<CelesFD_ResolvedOption> dynamicOptions = new List<CelesFD_ResolvedOption>();   // 当前节点动态选项（entryComps 注入）
 
         public float GetVariable(string name)
         {
@@ -24,36 +27,45 @@ namespace CelesFeature
                 variables[name] = value;
         }
 
-        public void ApplyOperations(List<CelesFD_VarOperationDef> ops)   // 批量 Set/Add
+        public string GetStringVariable(string name)
+            => !name.NullOrEmpty() && stringVariables.TryGetValue(name, out var v) ? v : null;
+
+        public void SetStringVariable(string name, string value)
+        {
+            if (name.NullOrEmpty()) return;
+            if (value == null)
+                stringVariables.Remove(name);
+            else
+                stringVariables[name] = value;
+        }
+
+        public void ApplyOperations(List<CelesFD_VarOperationDef> ops)   // 批量 Set/Add（新格式：元素名=操作）
         {
             if (ops == null) return;
             foreach (var op in ops)
             {
                 if (op.varName.NullOrEmpty()) continue;
-                switch (op.op)
-                {
-                    case CelesFD_VarOp.Set:
-                        SetVariable(op.varName, op.value);
-                        break;
-                    case CelesFD_VarOp.Add:
-                        SetVariable(op.varName, GetVariable(op.varName) + op.value);   // 加为 0 亦移除
-                        break;
-                }
+                if (op.Set.HasValue)
+                    SetVariable(op.varName, op.Set.Value);
+                else if (op.Add.HasValue)
+                    SetVariable(op.varName, GetVariable(op.varName) + op.Add.Value);   // 加为 0 亦移除
             }
         }
 
-        public bool CheckConditions(List<CelesFD_VarOperationDef> conds)   // AND 组合
+        public bool CheckConditions(List<CelesFD_VarOperationDef> conds)   // AND 组合（新格式：Equal/Gte）
         {
             if (conds == null || conds.Count == 0) return true;
             foreach (var c in conds)
             {
                 float val = GetVariable(c.varName);
-                bool pass = c.comparison switch
+                bool pass;
+                if (c.Equal.HasValue) pass = val == c.Equal.Value;
+                else if (c.Gte.HasValue) pass = val >= c.Gte.Value;
+                else
                 {
-                    CelesFD_VarCompare.Equal => val == c.value,
-                    CelesFD_VarCompare.GreaterOrEqual => val >= c.value,
-                    _ => false
-                };
+                    Log.Error($"[CelesFD] Condition on '{c.varName}' has no Equal/Gte");
+                    pass = true;
+                }
                 if (!pass) return false;
             }
             return true;
@@ -85,6 +97,7 @@ namespace CelesFeature
                 return;
             }
             currentNode = node;
+            RefreshDynamicOptions();   // 节点进入：执行 entryComps（刷新变量 / 注入动态选项）
             if (currentTree != null && !currentTree.isRoot)
                 SavedGameNode = currentNode.defName;   // game 树内节点变化自动保存进度
             Log.Message($"[CelesFD] GotoNode '{nodeDefName}'");
@@ -119,20 +132,68 @@ namespace CelesFeature
                 {
                     if (!CheckConditions(o.conditions)) continue;
                     result.Add(new CelesFD_ResolvedOption
-                    { Label = o.label, RecordText = o.recordText, Next = o.next, EnterTree = o.enterTree, Sets = o.sets, IsReward = o.isReward });
+                    { Label = o.label, RecordText = o.recordText, Next = o.next, EnterTree = o.enterTree,
+                        Sets = o.sets, IsReward = o.isReward, CompProps = o.comps, FailNode = o.failNode });
                 }
             }
+            result.AddRange(dynamicOptions);   // 节点 entryComps 注入的动态选项（如放弃清单）
             return result;
+        }
+
+        // 节点进入：清空并重新生成动态选项（entryComps 的 OnNodeEntered）
+        private void RefreshDynamicOptions()
+        {
+            dynamicOptions.Clear();
+            if (currentNode?.entryComps != null)
+                foreach (var cp in currentNode.entryComps)
+                    if (cp != null && cp.compClass != null)
+                        cp.MakeComp().OnNodeEntered(this);
+        }
+
+        public void ClearDynamicOptions() => dynamicOptions.Clear();
+        public void AddDynamicOption(CelesFD_ResolvedOption o) => dynamicOptions.Add(o);
+
+        // 节点文本 {varName} 插值：优先 string 变量，否则 float 变量取整显示
+        public string ResolveNodeText(string text)
+        {
+            if (text.NullOrEmpty()) return text;
+            var sb = new StringBuilder(text.Length);
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '{')
+                {
+                    int close = text.IndexOf('}', i + 1);
+                    if (close > i)
+                    {
+                        string varName = text.Substring(i + 1, close - i - 1);
+                        string sv = GetStringVariable(varName);
+                        sb.Append(sv ?? GetVariable(varName).ToString("0"));
+                        i = close;
+                        continue;
+                    }
+                }
+                sb.Append(text[i]);
+            }
+            return sb.ToString();
         }
 
         public string ResolveRecordText(CelesFD_ResolvedOption r)
             => r.RecordText.NullOrEmpty() ? r.Label : r.RecordText;
 
-        public void ApplyOption(CelesFD_ResolvedOption r)
+        // 动作先行 → 成功执行 sets；动作失败返回 false（不执行 sets、不跳转）
+        public bool ApplyOption(CelesFD_ResolvedOption r)
         {
+            if (r.CompProps != null)
+                foreach (var ap in r.CompProps)
+                {
+                    if (ap == null || ap.compClass == null) continue;
+                    if (!ap.MakeComp().TryExecute(this))
+                        return false;
+                }
             ApplyOperations(r.Sets);
             foreach (var s in r.Sets ?? new List<CelesFD_VarOperationDef>())
-                Log.Message($"[CelesFD] VarOp {s.varName} {s.op} {s.value} → now {GetVariable(s.varName)}");
+                Log.Message($"[CelesFD] VarOp {s.varName} {(s.Set.HasValue ? "Set=" + s.Set : s.Add.HasValue ? "Add=" + s.Add : "?")} → now {GetVariable(s.varName)}");
+            return true;
         }
 
         private void TriggerDebugInspect()

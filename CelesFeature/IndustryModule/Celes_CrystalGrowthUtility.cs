@@ -30,7 +30,9 @@ namespace CelesFeature
                         break;
                     }
                 }
-                if (!hasCluster && cell.Standable(map) && cellValidator(cell))
+                // [事实] 选格收紧：候选格必须无任何 Thing——Standable 不排除非 edifice Building（晶种/晶簇
+                // passability=Standable 会逃过检查），GenSpawn.Spawn 默认 WipeMode.Vanish 会 wipe 冲突物（GenSpawn.cs:139-142）
+                if (!hasCluster && cell.Standable(map) && cell.GetThingList(map).Count == 0 && cellValidator(cell))
                     candidates.Add(cell);
             }
 
@@ -72,6 +74,9 @@ namespace CelesFeature
         public static Celes_CrystalCluster SpawnCluster(IntVec3 cell, Map map, Celes_CompProperties_CrystalGrowth props,
             TerrainAffordanceDef affordanceNeeded)
         {
+            // 二次防御：多源同 tick 竞态下格已非空（如另一培育器刚 spawn），放弃避免 wipe 冲突物
+            if (cell.GetThingList(map).Count > 0)
+                return null;
             Celes_CrystalCluster cluster = (Celes_CrystalCluster)ThingMaker.MakeThing(props.baseGrowDef);
             cluster.InitGrowth(new List<int>(props.pointToGrow),
                 props.terrainToGrow != null ? new List<TerrainDef>(props.terrainToGrow) : null,

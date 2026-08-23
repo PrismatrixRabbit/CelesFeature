@@ -12,6 +12,8 @@ namespace CelesFeature
         // dev 直接生成（未走培育器 SpawnCluster/InitGrowth）时的默认参数兜底，XML 可配
         public List<int> pointToGrow;
         public List<TerrainDef> terrainToGrow;
+        // 各等级开采产出（1/2/4/16）；基类 Mineable 产出经 mineableDropChance=0 关闭（XML），由 PostDestroy 自产
+        public List<int> yieldByLevel;
 
         public Celes_CompProperties_CrystalCluster()
         {
@@ -39,6 +41,35 @@ namespace CelesFeature
             if (index < 0 || index >= levelGraphicCache.Count)
                 return null;
             return levelGraphicCache[index];
+        }
+
+        // 问题 1：Inspect 显示等级
+        public override string CompInspectStringExtra()
+        {
+            string text = base.CompInspectStringExtra();
+            string s = "晶体等级: " + ((parent as Celes_CrystalCluster)?.Level ?? 0);
+            return text.NullOrEmpty() ? s : text + "\n" + s;
+        }
+
+        // 问题 2：等级产出——[事实] 覆写链实证：DestroyMined(非virtual) → base.Destroy → ThingWithComps.Destroy 无条件回调
+        // comps.PostDestroy（ThingWithComps.cs:299-305），三条摧毁路径全覆盖；基类产出经 dropChance=0 关闭（Mineable.cs:68）
+        // [事实] PostDestroy 时 thing 已 deSpawn，previousMap/Position 可用（CompRefuelable.PostDestroy 先例 :164-179）
+        public override void PostDestroy(DestroyMode mode, Map previousMap)
+        {
+            base.PostDestroy(mode, previousMap);
+            if (mode != DestroyMode.KillFinalize || previousMap == null)
+                return;
+            Celes_CrystalCluster cluster = parent as Celes_CrystalCluster;
+            if (cluster == null || Props.yieldByLevel == null || Props.yieldByLevel.Count == 0)
+                return;
+            int amount = (cluster.Level >= 1 && cluster.Level <= Props.yieldByLevel.Count)
+                ? Props.yieldByLevel[cluster.Level - 1] : 0;
+            ThingDef dropDef = parent.def.building?.mineableThing;
+            if (amount <= 0 || dropDef == null)
+                return;
+            Thing thing = ThingMaker.MakeThing(dropDef);
+            thing.stackCount = amount;
+            GenPlace.TryPlaceThing(thing, parent.Position, previousMap, ThingPlaceMode.Near);
         }
 
         // K1 测试辅助：DEV gizmo（god mode 下显示）
@@ -118,13 +149,17 @@ namespace CelesFeature
         }
 
         // [事实] 阈值语义：累计生长值，list 长度即等级上限（可扩展，XML 加数值即加一级）
+        // 升级触发 MapMeshDirty 刷新贴图（[事实] MapMeshOnly 需显式重建，Thing.cs:1341-1345；Plant.cs:617 范式）
         public void AddGrowthPoint(int amount)
         {
             if (pointThresholds == null)
                 return;
             growthPoints += amount;
+            int prevLevel = level;
             while (level < MaxLevel && growthPoints >= pointThresholds[level])
                 level++;
+            if (level != prevLevel && Spawned)
+                Map.mapDrawer.MapMeshDirty(Position, MapMeshFlagDefOf.Things);
         }
 
         // [事实] 地板改变摧毁：TickLong 2000tick 轮询，参照 Plant.DyingBecauseOfTerrainTags（Plant.cs:263-269）

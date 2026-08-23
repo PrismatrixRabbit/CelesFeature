@@ -64,17 +64,32 @@ namespace CelesFeature
             if (Find.TickManager.TicksGame < nextGrowTick)
                 return;
             nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
-            // U3 定稿：每次检测扣 1，无论成败；先扣后判，耗尽当次不检测
+            DoGrowCheckNow();
+        }
+
+        // 单次生长检测（自动路径与 DEV 共用；U3：每次检测扣 1，先扣后判，耗尽当次不检测）
+        // 失活时贴图切换需 MapMeshDirty（[事实] MapMeshOnly 需显式重建，Thing.cs:1341-1345；Plant.cs:617 范式）
+        public void DoGrowCheckNow()
+        {
+            if (!parent.Spawned || !IsActive)
+                return;
             attemptsRemaining--;
             if (attemptsRemaining <= 0)
             {
                 attemptsRemaining = 0;
+                DirtyMapMesh();
                 return;
             }
             TerrainAffordanceDef affordance = null;
             if (Props.terrainCheckMode == CrystalTerrainCheckMode.Affordance)
                 affordance = parent.def.terrainAffordanceNeeded;
             Celes_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props, CellValidator, affordance);
+        }
+
+        private void DirtyMapMesh()
+        {
+            if (parent.Spawned)
+                parent.Map.mapDrawer.MapMeshDirty(parent.Position, MapMeshFlagDefOf.Things);
         }
 
         private bool CellValidator(IntVec3 cell)
@@ -89,10 +104,12 @@ namespace CelesFeature
         }
 
         // U4 定稿：重置活性接口预留，MVP 仅 DEV gizmo 使用（互动 Job/Work 不注册）
+        // 失活→活跃贴图切换需 MapMeshDirty 刷新
         public void ResetSeed()
         {
             attemptsRemaining = Props.attemptsLimit;
             nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
+            DirtyMapMesh();
         }
 
         // 选中圈：显示 growRadius 生效范围（类太阳灯，放置 ghost 见 PlaceWorker_CrystalGrowRadius）
@@ -113,7 +130,8 @@ namespace CelesFeature
             yield return new Command_Action
             {
                 defaultLabel = "DEV: 立即检测",
-                action = delegate { nextGrowTick = 0; }
+                // 同步直调（不依赖下一 tick 调度，必然生效）；失活时无效（重置活性是另一个 DEV 按钮的职责）
+                action = delegate { DoGrowCheckNow(); }
             };
         }
 

@@ -19,6 +19,7 @@ namespace CelesFeature
         public List<TerrainDef> terrainToGrow;
         public List<int> pointToGrow = new List<int> { 0, 2, 5, 10 };
         public float chanceToGrow = 0.33f;
+        public TerrainDef spawnTerrain;   // 晶簇生成位置创建的地板（layerable 晶化表面）
     }
 
     public class Celes_CompProperties_CrystalSeeder : Celes_CompProperties_CrystalGrowth

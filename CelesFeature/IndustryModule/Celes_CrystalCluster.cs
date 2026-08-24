@@ -14,6 +14,8 @@ namespace CelesFeature
         public List<TerrainDef> terrainToGrow;
         // 各等级开采产出（1/2/4/16）；基类 Mineable 产出经 mineableDropChance=0 关闭（XML），由 PostDestroy 自产
         public List<int> yieldByLevel;
+        // 豁免地板（人工晶态表面/晶化表面）——铺到晶簇脚下不触发地板替换破坏
+        public List<TerrainDef> protectedTerrains;
 
         public Celes_CompProperties_CrystalCluster()
         {
@@ -121,7 +123,8 @@ namespace CelesFeature
             }
         }
 
-        // 地板改变/支撑不足 → 摧毁（独立于生长门控）
+        // 地板改变/支撑不足 → 摧毁（独立于生长门控）；豁免地板（人工晶态表面/晶化表面）不触发
+        // [事实] terrainDefs null 兜底：旧存档/旧 DLL 生成实例可能无实例列表——退回 def Comp 配置；仍 null 则按"非豁免即摧毁"
         public void ForceTerrainCheck()
         {
             if (!Spawned)
@@ -132,10 +135,20 @@ namespace CelesFeature
                 if (!Position.GetAffordances(Map).Contains(affordanceNeeded))
                     Destroy(DestroyMode.Vanish);
             }
-            else if (terrainDefs != null && !terrainDefs.Contains(Map.terrainGrid.TerrainAt(Position)))
+            else
             {
-                // [事实] Mineable 覆写 Destroy(DestroyMode) 无默认参数（Mineable.cs:50）；Vanish 不触发产出掉落（:54 仅 KillFinalize）
-                Destroy(DestroyMode.Vanish);
+                TerrainDef terrain = Map.terrainGrid.TerrainAt(Position);
+                Celes_CompProperties_CrystalCluster props = def.GetCompProperties<Celes_CompProperties_CrystalCluster>();
+                List<TerrainDef> terrains = terrainDefs;
+                if (terrains == null)
+                    terrains = props?.terrainToGrow;
+                List<TerrainDef> protectedList = props?.protectedTerrains;
+                if ((terrains == null || !terrains.Contains(terrain))
+                    && (protectedList == null || !protectedList.Contains(terrain)))
+                {
+                    // [事实] Mineable 覆写 Destroy(DestroyMode) 无默认参数（Mineable.cs:50）；Vanish 不触发产出掉落（:54 仅 KillFinalize）
+                    Destroy(DestroyMode.Vanish);
+                }
             }
         }
 

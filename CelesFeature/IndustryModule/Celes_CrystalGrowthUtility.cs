@@ -77,6 +77,9 @@ namespace CelesFeature
             // 二次防御：多源同 tick 竞态下格已非空（如另一培育器刚 spawn），放弃避免 wipe 冲突物
             if (cell.GetThingList(map).Count > 0)
                 return null;
+            // 晶簇位置创建感染地板（layerable 铺层——可逆拆除还原原始地形；不触发地板破坏——protectedTerrains 豁免）
+            if (props.spawnTerrain != null)
+                map.terrainGrid.SetTerrain(cell, props.spawnTerrain);
             Celes_CrystalCluster cluster = (Celes_CrystalCluster)ThingMaker.MakeThing(props.baseGrowDef);
             cluster.InitGrowth(new List<int>(props.pointToGrow),
                 props.terrainToGrow != null ? new List<TerrainDef>(props.terrainToGrow) : null,

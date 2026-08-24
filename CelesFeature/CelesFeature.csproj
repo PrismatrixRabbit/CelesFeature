@@ -175,6 +175,7 @@
         <Compile Include="IndustryModule\Celes_CompCrystalBlight.cs" />
         <Compile Include="IndustryModule\Celes_CompCrystalSeed.cs" />
         <Compile Include="IndustryModule\Celes_CompCrystalSeeder.cs" />
+        <Compile Include="IndustryModule\Celes_CompCrystalTerrainSpread.cs" />
         <Compile Include="IndustryModule\Celes_CrystalCluster.cs" />
         <Compile Include="IndustryModule\Celes_CrystalGrowthUtility.cs" />
         <Compile Include="IndustryModule\Celes_JobDriver_CorpseRefuel.cs" />

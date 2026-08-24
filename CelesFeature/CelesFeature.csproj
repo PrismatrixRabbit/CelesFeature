@@ -172,6 +172,7 @@
         <Compile Include="IndustryModule\Alert_HubInterference.cs" />
         <Compile Include="IndustryModule\Alert_HubOverload.cs" />
         <Compile Include="IndustryModule\Celes_CompCorpseFuel.cs" />
+        <Compile Include="IndustryModule\Celes_CompCrystalBlight.cs" />
         <Compile Include="IndustryModule\Celes_CompCrystalSeed.cs" />
         <Compile Include="IndustryModule\Celes_CompCrystalSeeder.cs" />
         <Compile Include="IndustryModule\Celes_CrystalCluster.cs" />

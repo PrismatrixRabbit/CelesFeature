@@ -137,12 +137,14 @@ namespace CelesFeature
 
         public override string CompInspectStringExtra()
         {
-            if (!Prefs.DevMode)
-                return base.CompInspectStringExtra();
             string text = base.CompInspectStringExtra();
-            text = text.NullOrEmpty() ? "" : text + "\n";
+            string s = "状态: " + (IsActive ? "活性" : "失活");
+            if (!text.NullOrEmpty())
+                s = text + "\n" + s;
             // U7b 定稿：剩余次数玩家不可见，dev 可见
-            return text + "DEV: 剩余判定次数 " + attemptsRemaining + "/" + Props.attemptsLimit;
+            if (Prefs.DevMode)
+                s += "\nDEV: 剩余判定次数 " + attemptsRemaining + "/" + Props.attemptsLimit;
+            return s;
         }
 
         public override void PostExposeData()

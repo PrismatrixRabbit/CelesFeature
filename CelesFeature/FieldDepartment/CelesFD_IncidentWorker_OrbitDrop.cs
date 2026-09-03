@@ -14,33 +14,59 @@ namespace CelesFeature
     {
         protected override bool TryExecuteWorker(IncidentParms parms)
         {
+            // 2026-08-25 开局任务链：初始晶体坠落特化——派系存在前置 + 置位触发时刻（道歉信 3700 起算=事件触发时刻）
+            if (def == CelesFD_DefOf.CelesFD_InitialCrystalOrbitDrop)
+            {
+                if (CelesFD_BeaconUtility.BeaconFaction == null)
+                {
+                    Log.Message("[CelesFD] Initial crystal orbit drop skipped (beacon faction missing)");
+                    return false;
+                }
+                CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+                if (gc != null)
+                {
+                    gc.CrystalEventTriggered = true;
+                    gc.CrystalEventTick = Find.TickManager.TicksGame;
+                }
+            }
+
             Map map = (Map)parms.target;
             CelesFD_OrbitDropExtension ext = def.GetModExtension<CelesFD_OrbitDropExtension>();
             if (ext == null || ext.crates == null || ext.crates.Count == 0) return false;
 
             // 2026-08-15 用户裁决：集中坠落——一次确定中心（原版 DropThingGroupsNear dropCenter 附近语义），物品/pawn/建筑共用
+            // W-2b（R5 降噪）：逐条目插桩移除（卡舱已根治）——仅保留单条事件摘要
             IntVec3 dropCenter = DropCellFinder.RandomDropSpot(map);
             var things = new List<Thing>();
+            int crateCount = 0, thingCrates = 0, buildingCrates = 0;
             foreach (CelesFD_OrbitDropExtension.CelesFD_OrbitDropCrateEntry crateEntry in ext.crates)
             {
                 if (crateEntry.crateDef == null || crateEntry.crateDef.contents.NullOrEmpty()) continue;
                 int count = crateEntry.countRange.RandomInRange;
                 for (int i = 0; i < count; i++)
-                    GenerateCrate(map, dropCenter, crateEntry.crateDef, things);
+                {
+                    crateCount++;
+                    CelesFD_DropContentEntry picked = crateEntry.crateDef.contents.RandomElementByWeight(e => e.weight);
+                    if (picked != null && picked.type == CelesFD_DropContentType.Building) buildingCrates++;
+                    else thingCrates++;
+                    GenerateCrate(map, dropCenter, crateEntry.crateDef, things, picked);
+                }
             }
 
             if (things.Count > 0)
                 DropPodUtility.DropThingsNear(dropCenter, map, things,
                     faction: CelesFD_BeaconUtility.BeaconFaction);   // 星铃空投舱（G1 资产）——同中心集中（DropThingGroupsNear 链）
+            Log.Message($"[CelesFD] OrbitDrop '{def.defName}': {crateCount} crates ({thingCrates} scatter / {buildingCrates} building), {things.Count} loose things @ {dropCenter}");
             // 2026-08-15 用户裁决：letter 指向落点（"转至目标地点"+箭头——LookTargets 驱动，原版 ResourcePodCrash.cs:14 同款）
             SendStandardLetter(parms, new LookTargets(new TargetInfo(dropCenter, map)));
             return true;
         }
 
-        // 单坠落物：内容按权重随机选一项（每坠落物独立抽取——用户裁决）→ 物品/pawn（装入舱）/ 建筑（下降 def → 落地 r=10 生成）
-        private static void GenerateCrate(Map map, IntVec3 dropCenter, CelesFD_DropCrateDef crate, List<Thing> things)
+        // 单坠落物：内容按权重随机选一项（每坠落物独立抽取——用户裁决；W-2a-fix：prePicked 为插桩预抽取，
+        //   日志与实际生成共用同一条目）→ 物品/pawn（装入舱）/ 建筑（下降 def → 落地 r=10 生成）
+        private static void GenerateCrate(Map map, IntVec3 dropCenter, CelesFD_DropCrateDef crate, List<Thing> things, CelesFD_DropContentEntry prePicked = null)
         {
-            CelesFD_DropContentEntry entry = crate.contents.RandomElementByWeight(e => e.weight);
+            CelesFD_DropContentEntry entry = prePicked != null ? prePicked : crate.contents.RandomElementByWeight(e => e.weight);
             if (entry == null) return;
             switch (entry.type)
             {

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Linq;
 using System.Text;
 using HarmonyLib;
@@ -28,7 +27,7 @@ namespace CelesFeature
             5395, // BurstShotFireRate
             5390, // Range
         };
-        // ── 1B: Transpiler ──
+        // ── Patch 挂载（2026-08-15 起：Prefix 替代 Transpiler——IL 零改动，多 Mod 组合安全；FD-G06 清理过期标题）──
         static Harmony_CelesMultiVerb()
         {
             Harmony harmony = new Harmony("CelesFeature.MultiVerb");

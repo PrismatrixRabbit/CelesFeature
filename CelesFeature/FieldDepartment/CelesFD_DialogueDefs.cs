@@ -4,6 +4,9 @@ using Verse;
 namespace CelesFeature
 {
     // 变量操作/条件：元素名=操作，值=数量（Equal/Gte 用于 conditions；Set/Add 用于 sets；Add 负值=减）
+    // ═══ RPN 操作符（2026-08-25 用户方案）：conditions 列表 = 逆波兰表达式——
+    //   原子（Equal/Gte）压栈；Not 弹 1 压 1（取反）；And/Or 弹 2 压 1；栈余值隐式 AND（旧 XML 纯原子列表兼容）
+    //   XML 写法：<Not>true</Not> / <And>true</And> / <Or>true</Or>（显式值——空元素 DirectXmlToObject 报错，None 教训）
     public class CelesFD_VarOperationDef
     {
         public string varName;
@@ -11,6 +14,9 @@ namespace CelesFeature
         public float? Gte;     // 条件：var >= value
         public float? Set;     // 操作：var = value
         public float? Add;     // 操作：var += value（Add 负值=减）
+        public bool? Not;
+        public bool? And;
+        public bool? Or;
     }
 
     public class CelesFD_DialogueBranchDef

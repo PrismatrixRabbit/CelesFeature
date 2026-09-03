@@ -55,6 +55,7 @@ namespace CelesFeature
         public float validLevelWeightFactor = 1f;
         public List<CelesFD_MarketEntry> includeThings;
         public List<CelesFD_VarOperationDef> prerequisiteConditions;  // 彩蛋前置判定（复用 VarOperationDef Equal/Gte）
+        public float easterEggChance = 1f;      // 彩蛋入池概率（每次刷新独立掷骰；默认 1 = 前置满足必入池（兼容旧 Def）；FD-G35 2026-09-02 用户裁决"小概率出现"）
         public string letterDef;                   // 彩蛋专属 letter DefName（null=默认彩蛋通知）
         public int orderDurationInQuadrums = 1;    // 履约期限（象，默认 1 象=1 个刷新周期）
         public bool haveSpecialRequire;
@@ -149,6 +150,10 @@ namespace CelesFeature
                         yield return "validLevel references missing UnlockLevelDef '" + lv + "' (defName=" + defName + ")";
                 }
             }
+
+            // FD-G35：彩蛋入池概率校验（0 < chance <= 1）
+            if (category == CelesFD_MarketCategory.EasterEgg && (easterEggChance <= 0f || easterEggChance > 1f))
+                yield return "EasterEgg def easterEggChance must be in (0,1] (defName=" + defName + ")";
 
             // 常驻×锁定冗余（v4.1）：isGuaranteed 时 isLockable 忽略 → Warning（ConfigErrors 只收 Error，此处直接 Log.Warning）
             if (isGuaranteed && isLockable)

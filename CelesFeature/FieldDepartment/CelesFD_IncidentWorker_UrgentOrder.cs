@@ -11,7 +11,12 @@ namespace CelesFeature
     {
         protected override bool CanFireNowSub(IncidentParms parms)
         {
-            return CelesFD_GameComponent.Instance != null;
+            if (CelesFD_GameComponent.Instance == null) return false;
+            // 2026-08-29 用户需求：突发订单需"破译星铃频段"研究完成后才触发——
+            // CanFireNowSub 拦截（原版语义：事件当前不可发生，SingleMTB 下个 interval 自然重试；研究完成（道歉信解锁或自行研究）后自动恢复）
+            ResearchProjectDef proj = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(CelesFD_IncidentWorker_Apology.DecryptFreqProjectDefName);
+            if (proj != null && !proj.IsFinished) return false;
+            return true;
         }
 
         protected override bool TryExecuteWorker(IncidentParms parms)

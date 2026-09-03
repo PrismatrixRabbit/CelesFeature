@@ -38,7 +38,7 @@ namespace CelesFeature
             // ④ 生成 + 命名
             var s = CelesFD_BeaconUtility.GenerateStation(tile);
             // ⑤ 扣信用 + letter（文案从 IncidentDef letter 三件套读）
-            gc.Credit -= cost;
+            gc.ModifyCredit(-cost);   // FD-G21（2026-09-02）：收敛 setter（原直写字段——D2 纪律违例之一）
             if (s != null)
                 SendStandardLetter(parms, new LookTargets(new GlobalTargetInfo(s)),
                     CelesFD_BeaconUtility.FormatStationDescription(s).Named("STATION"));

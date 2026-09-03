@@ -98,6 +98,7 @@ namespace CelesFeature
         private static void DevTestTileSelector()
         {
             Faction beacon = Find.FactionManager.AllFactionsListForReading.FirstOrDefault(f => f.def == CelesFD_DefOf.Celes_BeaconFaction);
+            // FD-G24②（2026-09-02 用户裁决恢复）：dev 显式触发的动作日志不属高频刷屏，恢复输出
             Log.Message($"[CelesFD] TileSelector beacon: {(beacon != null ? beacon.Name : "NULL")}   worldFactions={Find.World.info.factions?.Count ?? -1}");
             var near = new List<int>();
             var far = new List<int>();

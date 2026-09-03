@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using RimWorld;
 using UnityEngine;
@@ -27,37 +28,119 @@ namespace CelesFeature
             }
         }
 
-        // 按战利品表填内容（2026-08-15 用户裁决：每容器独立抽一项——RandomElementByWeight，与坠落物语义一致）
+        // 按战利品表填内容（2026-08-15 用户裁决：每容器独立抽一项——RandomElementByWeight，与坠落物语义一致；
+        //   W-2a：table.spawnAll=true → 固定清单全条目生成——早期武备空投等支援投送）
         public void FillFromLootTable(CelesFD_LootTableDef table)
         {
             if (table == null || table.contents == null || table.contents.Count == 0) return;
-            CelesFD_DropContentEntry entry = table.contents.RandomElementByWeight(e => e.weight);
-            if (entry == null) return;
-            int amount = Mathf.Max(1, entry.amountRange.RandomInRange);
-            for (int i = 0; i < amount; i++)
+            IEnumerable<CelesFD_DropContentEntry> entries;
+            if (table.spawnAll)
             {
-                Thing content = null;
-                switch (entry.type)
-                {
-                    case CelesFD_DropContentType.Thing:
-                        ThingDef td = DefDatabase<ThingDef>.GetNamedSilentFail(entry.thingDefName);
-                        if (td != null) content = ThingMaker.MakeThing(td);
-                        break;
-                    case CelesFD_DropContentType.PawnKind:
-                        PawnKindDef pk = DefDatabase<PawnKindDef>.GetNamedSilentFail(entry.pawnKindDefName);
-                        if (pk != null)
-                            content = PawnGenerator.GeneratePawn(new PawnGenerationRequest(pk, GetDefaultFaction(pk), PawnGenerationContext.NonPlayer));
-                        break;
-                    case CelesFD_DropContentType.ManhunterAnimal:
-                        content = GenerateManhunterAnimal(entry.pawnKindDefName);
-                        break;
-                    case CelesFD_DropContentType.RefugeeInjured:
-                        content = GenerateRefugeeInjured();
-                        break;
-                }
-                if (content != null)
-                    innerContainer.TryAdd(content);
+                entries = table.contents;
             }
+            else
+            {
+                CelesFD_DropContentEntry picked = table.contents.RandomElementByWeight(e => e.weight);
+                if (picked == null) return;
+                entries = new List<CelesFD_DropContentEntry> { picked };
+            }
+            foreach (CelesFD_DropContentEntry entry in entries)
+            {
+                int amount = Mathf.Max(1, entry.amountRange.RandomInRange);
+                for (int i = 0; i < amount; i++)
+                {
+                    Thing content = null;
+                    switch (entry.type)
+                    {
+                        case CelesFD_DropContentType.Thing:
+                            content = MakeThingFromEntry(entry);
+                            break;
+                        case CelesFD_DropContentType.PawnKind:
+                            PawnKindDef pk = DefDatabase<PawnKindDef>.GetNamedSilentFail(entry.pawnKindDefName);
+                            if (pk != null)
+                                content = PawnGenerator.GeneratePawn(new PawnGenerationRequest(pk, GetDefaultFaction(pk), PawnGenerationContext.NonPlayer));
+                            break;
+                        case CelesFD_DropContentType.ManhunterAnimal:
+                            content = GenerateManhunterAnimal(entry.pawnKindDefName);
+                            break;
+                        case CelesFD_DropContentType.RefugeeInjured:
+                            content = GenerateRefugeeInjured();
+                            break;
+                    }
+                    if (content != null)
+                        innerContainer.TryAdd(content);
+                }
+            }
+        }
+
+        // W-2a：条目 → 物品（品质 QualityRange / 材质 stuffDefName 注入——早期武备空投"三件武器品质均一般"）
+        private static Thing MakeThingFromEntry(CelesFD_DropContentEntry entry)
+        {
+            ThingDef td = DefDatabase<ThingDef>.GetNamedSilentFail(entry.thingDefName);
+            if (td == null) return null;
+            Thing thing;
+            if (!entry.stuffDefName.NullOrEmpty())
+            {
+                ThingDef stuff = DefDatabase<ThingDef>.GetNamedSilentFail(entry.stuffDefName);
+                thing = stuff != null ? ThingMaker.MakeThing(td, stuff) : ThingMaker.MakeThing(td);
+            }
+            else
+            {
+                thing = ThingMaker.MakeThing(td);
+            }
+            if (entry.qualityRange.HasValue)
+            {
+                CompQuality comp = thing.TryGetComp<CompQuality>();
+                if (comp != null)
+                {
+                    // QualityRange 为裸结构（min/max/Includes/FromString——QualityRange.cs 实证，无 RandomInRange）；
+                    // 范围内随机 = Rand.RangeInclusive + 枚举强转（IntRange.RandomInRange 内部同款模式）；
+                    // SetQuality 双参（CompQuality.cs:12 实证）——生成物来源取 Outsider（商人/世界生成物同款）
+                    QualityCategory q = (QualityCategory)Rand.RangeInclusive(
+                        (int)entry.qualityRange.Value.min, (int)entry.qualityRange.Value.max);
+                    comp.SetQuality(q, ArtGenerationContext.Outsider);
+                }
+            }
+            return thing;
+        }
+
+        // ── W-2a：开态贴图（Building_Grave.fullGraveGraphicData 模式反转——满态换图→开态换图；A2-11）──
+        // openedEver 持久化：初始空容器与开过容器需区分（不可纯查询）；Open 置位 + 重绘（base.Open 弹内容后自调 DirtyMapMesh）
+        private bool openedEver;
+        private Graphic cachedOpenGraphic;
+
+        public override Graphic Graphic
+        {
+            get
+            {
+                if (openedEver)
+                {
+                    CelesFD_OpenGraphicExtension ext = def.GetModExtension<CelesFD_OpenGraphicExtension>();
+                    if (ext != null && ext.openGraphicData != null)
+                    {
+                        if (cachedOpenGraphic == null)
+                            cachedOpenGraphic = ext.openGraphicData.GraphicColoredFor(this);
+                        return cachedOpenGraphic;
+                    }
+                }
+                return base.Graphic;
+            }
+        }
+
+        public override void Open()
+        {
+            base.Open();
+            if (!openedEver)
+            {
+                openedEver = true;
+                if (Spawned) DirtyMapMesh(Map);
+            }
+        }
+
+        public override void ExposeData()
+        {
+            base.ExposeData();
+            Scribe_Values.Look(ref openedEver, "CFD_openedEver", false);
         }
 
         // pawnKind 默认派系（PawnKindDef.defaultFactionDef——PawnKindDef.cs:13-14 实证；未配 → null 无派系）

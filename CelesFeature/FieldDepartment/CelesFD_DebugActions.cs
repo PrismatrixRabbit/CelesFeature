@@ -251,5 +251,141 @@ namespace CelesFeature
                 ? "[CelesFD] Manual refresh OK"
                 : "[CelesFD] Manual refresh rejected (cooldown / insufficient funds)");
         }
+
+        // W-1 验证辅助：给选中 pawn 装备星铃支援呼叫器（替换同层旧衣）——呼叫器链路测试入口
+        [DebugAction("CelesFD", "Grant support caller (W1)")]
+        private static void GrantSupportCaller()
+        {
+            Pawn pawn = Find.Selector.SingleSelectedThing as Pawn;
+            if (pawn == null || pawn.apparel == null)
+            {
+                Messages.Message("CelesFD_Keyed_SelectPawnFirst".Translate(), MessageTypeDefOf.RejectInput);
+                return;
+            }
+            ThingDef def = CelesFD_DefOf.CelesFD_SupportCaller;
+            if (def == null)
+            {
+                Log.Error("[CelesFD] CelesFD_SupportCaller def not found");
+                return;
+            }
+            Apparel apparel = (Apparel)ThingMaker.MakeThing(def);
+            pawn.apparel.Wear(apparel, true);
+            Log.Message("[CelesFD] Support caller granted to " + pawn.LabelShort);
+        }
+
+        // W-1 验证辅助：给指定武备支援加 5 次可用（绕过审批直接测施放链）
+        [DebugAction("CelesFD", "Grant support charges (W1)")]
+        private static void GrantSupportCharges()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            var defs = DefDatabase<CelesFD_SupportDef>.AllDefsListForReading
+                .Where(d => d.supportType == CelesFD_SupportType.CombatEquipment).ToList();
+            if (defs.Count == 0)
+            {
+                Log.Error("[CelesFD] No combat equipment support defs found");
+                return;
+            }
+            List<DebugMenuOption> options = new List<DebugMenuOption>();
+            foreach (CelesFD_SupportDef def in defs)
+            {
+                CelesFD_SupportDef localDef = def;
+                options.Add(new DebugMenuOption(localDef.LabelCap + " +5 (" + gc.AvailableCount(localDef) + ")",
+                    DebugMenuOptionMode.Action,
+                    delegate
+                    {
+                        gc.GetSupportState(localDef).available += 5;
+                        Log.Message("[CelesFD] Support charges +5: " + localDef.defName + " available=" + gc.AvailableCount(localDef));
+                    }));
+            }
+            Find.WindowStack.Add(new Dialog_DebugOptionListLister(options));
+        }
+
+        // W-2b 验证辅助：一键给全部支援各 +5 次可用（遍历所有种类——批量测试入口）
+        [DebugAction("CelesFD", "Grant ALL support charges +5 (W2)")]
+        private static void GrantAllSupportCharges()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            var defs = DefDatabase<CelesFD_SupportDef>.AllDefsListForReading;
+            if (defs.Count == 0)
+            {
+                Log.Error("[CelesFD] No support defs found");
+                return;
+            }
+            foreach (CelesFD_SupportDef def in defs)
+                gc.GetSupportState(def).available += 5;
+            Log.Message("[CelesFD] Support charges +5 granted to all " + defs.Count + " support defs");
+        }
+
+        // W-1 验证辅助：输出全部支援状态（available/pending/审批起点）——批内定位用
+        [DebugAction("CelesFD", "Log support state (W1)")]
+        private static void LogSupportState()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null)
+            {
+                Log.Message("[CelesFD] GC null");
+                return;
+            }
+            if (gc.SupportStates.Count == 0)
+            {
+                Log.Message("[CelesFD] No support states");
+                return;
+            }
+            foreach (CelesFD_SupportState s in gc.SupportStates)
+                Log.Message(string.Format("[CelesFD] support {0}: available={1} pending={2} pendingSinceTick={3}",
+                    s.defName, s.available, s.pending, s.pendingSinceTick));
+        }
+
+        // W-2a 验证辅助：直接触发支援坠落（绕呼叫器链——信标+效果全流程）
+        // ToolMap 模式（2026-09-03 用户要求：选中后切回地图由测试者点选位置——原版 Trigger 行为；
+        // 无参方法自读 UI.MouseCell() = 原版样本模式，DebugActionsMapManagement.cs:209-212 同款）
+        [DebugAction("CelesFD", "Trigger support strike (W2)", actionType = DebugActionType.ToolMap, allowedGameStates = AllowedGameStates.PlayingOnMap)]
+        private static void TriggerSupportStrike()
+        {
+            Map map = Find.CurrentMap;
+            if (map == null) return;
+            IntVec3 cell = UI.MouseCell();
+            if (!cell.InBounds(map))
+            {
+                Log.Error("[CelesFD] Target cell out of bounds");
+                return;
+            }
+            CelesFD_SupportDef def = DefDatabase<CelesFD_SupportDef>.AllDefsListForReading
+                .FirstOrDefault(d => d.supportType == CelesFD_SupportType.CombatEquipment);
+            if (def == null)
+            {
+                Log.Error("[CelesFD] No support defs found");
+                return;
+            }
+            CelesFD_SupportBeacon beacon = (CelesFD_SupportBeacon)ThingMaker.MakeThing(CelesFD_DefOf.CelesFD_SupportBeacon);
+            GenSpawn.Spawn(beacon, cell, map);
+            beacon.SupportDef = def;
+            beacon.originCell = cell;
+            Log.Message("[CelesFD] Support strike triggered (debug): " + def.defName + " at " + cell);
+        }
+
+        // W-2a 验证辅助：输出支援信标状态（阶段/剩余/控制器数）
+        [DebugAction("CelesFD", "Log support beacons (W2)")]
+        private static void LogSupportBeacons()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null)
+            {
+                Log.Message("[CelesFD] GC null");
+                return;
+            }
+            int live = 0;
+            foreach (CelesFD_SupportBeacon b in gc.SupportBeacons)
+            {
+                if (b == null || b.Destroyed) continue;
+                live++;
+                int remaining = b.phase == CelesFD_SupportBeacon.BeaconPhase.Waiting ? b.WaitingTicksLeft : b.OngoingTicksLeft();
+                Log.Message(string.Format("[CelesFD] beacon {0}: phase={1} remaining={2} controllers={3} pos={4}",
+                    b.SupportDef != null ? b.SupportDef.defName : "(null)", b.phase, remaining, b.controllers.Count, b.Position));
+            }
+            if (live == 0) Log.Message("[CelesFD] No live support beacons");
+        }
     }
 }

@@ -192,6 +192,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             if (gc == null) return;
             if (!interrupted && gc.DialogueHistory.Count == 0)
                 gc.AddDialogue(false, "CelesFD_Keyed_Greeting_Placeholder".Translate());
+            gc.RefreshDialogueVars();   // 开局任务链：根树 conditions 依赖变量刷新（等级/关系/过期）
             gc.DialogueEngine.StartRootTree();
             StartTypingNodeText(gc.DialogueEngine);
             StartTicker(Time.realtimeSinceStartup);
@@ -328,7 +329,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
                 }
                 return;
             }
-            Log.Message($"[CelesFD] Pick '{o.Label}' → next '{(o.EnterTree.NullOrEmpty() ? o.Next : o.EnterTree)}'");
+            // 发布清理（2026-08-25）：高频日志——Log.Message($"[CelesFD] Pick '{o.Label}' → next '{(o.EnterTree.NullOrEmpty() ? o.Next : o.EnterTree)}'");
             if (!o.EnterTree.NullOrEmpty())
                 engine.EnterTree(o.EnterTree);   // 跨树进入：恢复进度或从 startNode 开始
             else
@@ -344,6 +345,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             if (engine.CurrentTree != null && !engine.CurrentTree.isRoot && engine.CurrentNode != null)
                 engine.SavedGameNode = engine.CurrentNode.defName;   // 保存 game 进度
             gc.AddDialogue(true, "CelesFD_Keyed_Return_Record".Translate());
+            gc.RefreshDialogueVars();         // 开局任务链：回根树前刷新（同打开时——根树 conditions 依赖）
             engine.StartRootTree();           // 进入 root 树（已 GotoNode startNode）
             StartTypingNodeText(engine);      // 逐字根树 startNode 文本
         }

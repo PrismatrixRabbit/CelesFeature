@@ -202,64 +202,6 @@ namespace CelesFeature
             };
         }
         // ============================================================
-        //  蓝图预览（PlaceWorker 委托）
-        //  参照 CompAffectedByFacilities.DrawLinesToPotentialThingsToLinkTo 静态方法模式
-        // ============================================================
-        public static void DrawPlacementPreview(ThingDef def, IntVec3 center, Rot4 rot, Map map)
-        {
-            CompProperties_ThreadConsumer consumerProps = def.GetCompProperties<CompProperties_ThreadConsumer>();
-            if (consumerProps == null)
-                return;
-
-            int theoreticalCost = consumerProps.baseThreadsCost;
-            Vector3 myCenter = GenThing.TrueCenter(center, rot, def.size, def.Altitude);
-            List<Building> allBuildings = map.listerBuildings.allBuildingsColonist;
-
-            List<(Building building, CompThreadProducer producer, float distSq, bool canAccept)> candidates =
-                new List<(Building, CompThreadProducer, float, bool)>();
-
-            for (int i = 0; i < allBuildings.Count; i++)
-            {
-                Building building = allBuildings[i];
-                CompThreadProducer producer = building.TryGetComp<CompThreadProducer>();
-                if (producer == null)
-                    continue;
-
-                GenDraw.DrawRadiusRing(building.Position, producer.Props.connectRadius);
-
-                if (!producer.IsOnline)
-                    continue;
-
-                if (!center.InHorDistOf(building.Position, producer.Props.connectRadius))
-                    continue;
-
-                float dx = center.x - building.Position.x;
-                float dz = center.z - building.Position.z;
-                float distSq = dx * dx + dz * dz;
-                bool canAccept = producer.CurrentLoad + theoreticalCost <= producer.TotalCapacity;
-
-                candidates.Add((building, producer, distSq, canAccept));
-            }
-
-            if (candidates.Count == 0)
-                return;
-
-            candidates.Sort((a, b) =>
-            {
-                if (a.canAccept != b.canAccept)
-                    return a.canAccept ? -1 : 1;
-                return a.distSq.CompareTo(b.distSq);
-            });
-
-            var best = candidates[0];
-            if (best.canAccept)
-                GenDraw.DrawLineBetween(myCenter, best.building.TrueCenter());
-            else
-                GenDraw.DrawLineBetween(myCenter, best.building.TrueCenter(),
-                    CompAffectedByFacilities.InactiveFacilityLineMat);
-        }
-
-        // ============================================================
         //  渲染
         // ============================================================
         public override void PostDrawExtraSelectionOverlays()

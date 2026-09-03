@@ -63,7 +63,7 @@ namespace CelesFeature
             // 1. 前置检查：checkNeed > 0 时资源不足即失败
             if (p.checkNeed > 0 && current < p.checkNeed)
             {
-                Log.Message($"[CelesFD] ResourceCheck FAIL: {p.resource}={current} < need={p.checkNeed}");
+                // 发布清理（2026-08-25）：Log.Message($"[CelesFD] ResourceCheck FAIL: {p.resource}={current} < need={p.checkNeed}");
                 return false;
             }
 
@@ -73,8 +73,15 @@ namespace CelesFeature
             else if (p.Set.HasValue)
                 SetResource(gc, p.resource, p.Set.Value);
 
-            Log.Message($"[CelesFD] ResourceComp: {p.resource} add={p.Add} set={p.Set} → {GetResource(gc, p.resource)}");
+            // 发布清理（2026-08-25）：高频日志——Log.Message($"[CelesFD] ResourceComp: {p.resource} add={p.Add} set={p.Set} → {GetResource(gc, p.resource)}");
             return true;
+        }
+
+        // 2026-08-25 开局任务链：补偿"进入 node 即发"——entryComps 挂 Resource comp 时节点进入即执行
+        // （TryExecute 复用；checkNeed 失败返回 false 无副作用——节点进入不检查返回值）
+        public override void OnNodeEntered(CelesFD_DialogueEngine engine)
+        {
+            TryExecute(engine);
         }
 
         private static int GetResource(CelesFD_GameComponent gc, CelesFD_FDResourceType type) => type switch
@@ -86,15 +93,62 @@ namespace CelesFeature
             _ => 0
         };
 
+        // FD-G25（2026-09-02）：Set 语义经收敛 setter 以差值实现（原直写字段——D2 纪律违例第二处，与 G21 同批修）
         private static void SetResource(CelesFD_GameComponent gc, CelesFD_FDResourceType type, int value)
         {
             switch (type)
             {
-                case CelesFD_FDResourceType.Credit: gc.Credit = value; break;
-                case CelesFD_FDResourceType.Key: gc.QuantumKey = value; break;
-                case CelesFD_FDResourceType.Fame: gc.Fame = value; break;
-                case CelesFD_FDResourceType.TradeVolume: gc.TradeVolume = value; break;
+                case CelesFD_FDResourceType.Credit: gc.ModifyCredit(value - gc.Credit); break;
+                case CelesFD_FDResourceType.Key: gc.ModifyQuantumKey(value - gc.QuantumKey); break;
+                case CelesFD_FDResourceType.Fame: gc.ModifyFame(value - gc.Fame); break;
+                case CelesFD_FDResourceType.TradeVolume: gc.ModifyTradeVolume(value - gc.TradeVolume); break;
             }
+        }
+    }
+
+    // ═══ 关闭发信器窗口 comp（2026-08-25）：挂断"结束"等效关闭页面（WindowStack 查找 CelesFD_Dialog_Comms → TryRemove） ═══
+    public class CelesFD_DialogueActionCompProperties_CloseWindow : CelesFD_DialogueActionCompProperties
+    {
+        public CelesFD_DialogueActionCompProperties_CloseWindow() { compClass = typeof(CelesFD_DialogueActionComp_CloseWindow); }
+    }
+
+    public class CelesFD_DialogueActionComp_CloseWindow : CelesFD_DialogueActionComp
+    {
+        public override bool TryExecute(CelesFD_DialogueEngine engine)
+        {
+            foreach (Window w in Find.WindowStack.Windows)
+                if (w is CelesFD_Dialog_Comms)
+                {
+                    Find.WindowStack.TryRemove(w);
+                    // 发布清理（2026-08-25）：Log.Message("[CelesFD] Dialogue close-window action: comms window closed");
+                    return true;
+                }
+            return true;   // 窗口不存在（防御）——不阻断选项流转
+        }
+    }
+
+    // ═══ 对话变量置位 comp（2026-08-25 开局任务链）：entryComps/选项 comps 均可——
+    //   进入节点（OnNodeEntered）或选择选项（TryExecute）时 Set 对话变量（如 ApologyViewed 防重复补偿）
+    public class CelesFD_DialogueActionCompProperties_SetVariable : CelesFD_DialogueActionCompProperties
+    {
+        public string varName;
+        public float Set;
+
+        public CelesFD_DialogueActionCompProperties_SetVariable() { compClass = typeof(CelesFD_DialogueActionComp_SetVariable); }
+    }
+
+    public class CelesFD_DialogueActionComp_SetVariable : CelesFD_DialogueActionComp
+    {
+        public override bool TryExecute(CelesFD_DialogueEngine engine)
+        {
+            var p = (CelesFD_DialogueActionCompProperties_SetVariable)props;
+            engine.SetVariable(p.varName, p.Set);
+            return true;
+        }
+
+        public override void OnNodeEntered(CelesFD_DialogueEngine engine)
+        {
+            TryExecute(engine);
         }
     }
 

@@ -658,27 +658,7 @@ namespace CelesFeature
         }
 
         // ═══ 工具 ═══
-        private static string FormatPrice(CelesFD_Order o)
-        {
-            float credit = o.CalcPriceCredit();
-            float key = o.CalcPriceKey();
-            if (credit > 0f && key > 0f)
-                return "CelesFD_Keyed_BothPrice".Translate(credit.ToString("0.##"), key.ToString("0.##"));
-            if (credit > 0f) return "CelesFD_Keyed_CreditAmount".Translate(credit.ToString("0.##"));
-            return "CelesFD_Keyed_KeyAmount".Translate(key.ToString("0.##"));
-        }
-
-        private static Color GetCategoryColor(CelesFD_MarketCategory cat)
-        {
-            switch (cat)
-            {
-                case CelesFD_MarketCategory.Open: return new Color(0.6f, 0.6f, 0.6f);       // 灰
-                case CelesFD_MarketCategory.Internal: return new Color(0.3f, 0.5f, 0.9f);   // 蓝
-                case CelesFD_MarketCategory.Precious: return new Color(0.9f, 0.75f, 0.2f);  // 金
-                case CelesFD_MarketCategory.EasterEgg: return new Color(0.9f, 0.4f, 0.8f);  // 粉
-                case CelesFD_MarketCategory.Urgent: return new Color(0.85f, 0.2f, 0.2f);    // 红
-                default: return Color.gray;
-            }
-        }
+        // FD-G24④（2026-09-02）：FormatPrice / GetCategoryColor 死代码删除（分别被 OrderCard 报酬自拼接与
+        // CelesFD_UIConfig.CategoryColor 取代；grep 复核全工程无引用后移除）
     }
 }

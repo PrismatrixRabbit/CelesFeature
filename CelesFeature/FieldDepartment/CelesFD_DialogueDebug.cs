@@ -17,12 +17,9 @@ namespace CelesFeature
             var trees = DefDatabase<CelesFD_DialogueTreeDef>.AllDefsListForReading;
             var nodes = DefDatabase<CelesFD_DialogueNodeDef>.AllDefsListForReading;
 
-            Log.Message($"[CelesFD] Dialogue defs loaded: {trees.Count} trees, {nodes.Count} nodes");
-            foreach (var t in trees)
-                Log.Message($"[CelesFD]   Tree {t.defName}: start={t.startNode} isRoot={t.isRoot} conditions={(t.conditions != null ? t.conditions.Count : 0)}");
-
-            foreach (var n in nodes)
-                Log.Message($"[CelesFD]   Node {n.defName}: textLen={n.nodeText.Length} options={(n.options != null ? n.options.Count : 0)}");
+            // 发布清理（2026-08-25）：加载期刷屏日志——Log.Message($"[CelesFD] Dialogue defs loaded: {trees.Count} trees, {nodes.Count} nodes");
+            // 发布清理（2026-08-25）：foreach (var t in trees) Log.Message($"[CelesFD]   Tree {t.defName}: start={t.startNode} isRoot={t.isRoot} conditions={(t.conditions != null ? t.conditions.Count : 0)}");
+            // 发布清理（2026-08-25）：foreach (var n in nodes) Log.Message($"[CelesFD]   Node {n.defName}: textLen={n.nodeText.Length} options={(n.options != null ? n.options.Count : 0)}");
 
             // 条件触发：数据缺失才 Log.Error（不刷屏）
             foreach (var t in trees)
@@ -100,8 +97,7 @@ namespace CelesFeature
             // Reset → 清空，GetVariable 判 0
             engine.ResetAllVariables();
             float afterReset = engine.GetVariable("fuel");
-            Log.Message($"[CelesFD] VarSys test: eqTrue={eqTrue} gteFalse={gteFalse} gteTrue={gteTrue} " +
-                $"zeroRemoved={removed} afterZero={afterZero} andTrue={andTrue} afterReset={afterReset}");
+            // FD-G24③（2026-09-02）：启动单测不打成功日志（原每启动一行刷屏）——失败仍 Log.Error
             if (!eqTrue || gteFalse || !gteTrue || !removed || afterZero != 0f || !andTrue || afterReset != 0f)
                 Log.Error("[CelesFD] VarSys test FAILED");
         }

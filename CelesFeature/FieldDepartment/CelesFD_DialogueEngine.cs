@@ -52,33 +52,62 @@ namespace CelesFeature
             }
         }
 
-        public bool CheckConditions(List<CelesFD_VarOperationDef> conds)   // AND 组合（新格式：Equal/Gte）
+        // ═══ 条件求值：RPN 栈求值（2026-08-25 用户方案） ═══
+        //   原子（Equal/Gte）压栈 → Not 弹 1 压 1 → And/Or 弹 2 压 1 → 栈余值隐式 AND（旧 XML 纯原子列表兼容）
+        //   操作数不足 = XML 栈序错误（Log.Error + 返回 false）
+        public bool CheckConditions(List<CelesFD_VarOperationDef> conds)
         {
             if (conds == null || conds.Count == 0) return true;
+            var stack = new Stack<bool>();
             foreach (var c in conds)
             {
-                float val = GetVariable(c.varName);
-                bool pass;
-                if (c.Equal.HasValue) pass = val == c.Equal.Value;
-                else if (c.Gte.HasValue) pass = val >= c.Gte.Value;
+                if (c.Not.HasValue)
+                {
+                    if (stack.Count < 1)
+                    {
+                        Log.Error($"[CelesFD] Condition NOT with empty stack");
+                        return false;
+                    }
+                    stack.Push(!stack.Pop());
+                }
+                else if (c.And.HasValue || c.Or.HasValue)
+                {
+                    if (stack.Count < 2)
+                    {
+                        Log.Error($"[CelesFD] Condition {(c.And.HasValue ? "AND" : "OR")} with insufficient operands");
+                        return false;
+                    }
+                    bool b = stack.Pop();
+                    stack.Push(c.And.HasValue ? (stack.Pop() && b) : (stack.Pop() || b));
+                }
                 else
                 {
-                    Log.Error($"[CelesFD] Condition on '{c.varName}' has no Equal/Gte");
-                    pass = true;
+                    float val = GetVariable(c.varName);
+                    bool pass;
+                    if (c.Equal.HasValue) pass = val == c.Equal.Value;
+                    else if (c.Gte.HasValue) pass = val >= c.Gte.Value;
+                    else
+                    {
+                        Log.Error($"[CelesFD] Condition on '{c.varName}' has no Equal/Gte");
+                        pass = true;
+                    }
+                    stack.Push(pass);
                 }
-                if (!pass) return false;
             }
-            return true;
+            bool result = true;
+            while (stack.Count > 0) result &= stack.Pop();   // 隐式 AND
+            return result;
         }
 
         public void ResetAllVariables() => variables.Clear();
 
-        public void LogVariables()   // 供 N_DebugInspect 调用
-        {
-            if (variables.Count == 0) { Log.Message("[CelesFD] Variables: (none)"); return; }
-            foreach (var kv in variables)
-                Log.Message($"[CelesFD] Var {kv.Key} = {kv.Value}");
-        }
+        // 发布清理（2026-08-25）：调试专用方法（仅 N_DebugInspect 使用）——判定块连带注释
+        // public void LogVariables()   // 供 N_DebugInspect 调用
+        // {
+        //     if (variables.Count == 0) { Log.Message("[CelesFD] Variables: (none)"); return; }
+        //     foreach (var kv in variables)
+        //         Log.Message($"[CelesFD] Var {kv.Key} = {kv.Value}");
+        // }
 
         // ═══ D4：节点导航 ═══
         private CelesFD_DialogueTreeDef currentTree;
@@ -100,8 +129,9 @@ namespace CelesFeature
             RefreshDynamicOptions();   // 节点进入：执行 entryComps（刷新变量 / 注入动态选项）
             if (currentTree != null && !currentTree.isRoot)
                 SavedGameNode = currentNode.defName;   // game 树内节点变化自动保存进度
-            Log.Message($"[CelesFD] GotoNode '{nodeDefName}'");
-            if (nodeDefName == "N_DebugInspect") TriggerDebugInspect();
+            // 发布清理（2026-08-25）：高频日志——Log.Message($"[CelesFD] GotoNode '{nodeDefName}'");
+            // 发布清理（2026-08-25）：调试节点触发——连带注释
+            // if (nodeDefName == "N_DebugInspect") TriggerDebugInspect();
         }
 
         public List<CelesFD_ResolvedOption> GetVisibleOptions()
@@ -191,17 +221,19 @@ namespace CelesFeature
                         return false;
                 }
             ApplyOperations(r.Sets);
-            foreach (var s in r.Sets ?? new List<CelesFD_VarOperationDef>())
-                Log.Message($"[CelesFD] VarOp {s.varName} {(s.Set.HasValue ? "Set=" + s.Set : s.Add.HasValue ? "Add=" + s.Add : "?")} → now {GetVariable(s.varName)}");
+            // 发布清理（2026-08-25）：日志专用 foreach——连带注释
+            // foreach (var s in r.Sets ?? new List<CelesFD_VarOperationDef>())
+            //     Log.Message($"[CelesFD] VarOp {s.varName} {(s.Set.HasValue ? "Set=" + s.Set : s.Add.HasValue ? "Add=" + s.Add : "?")} → now {GetVariable(s.varName)}");
             return true;
         }
 
-        private void TriggerDebugInspect()
-        {
-            Log.Message("[CelesFD] === Debug Inspect ===");
-            LogVariables();
-            Log.Message($"[CelesFD] CurrentTree={currentTree?.defName} CurrentNode={currentNode?.defName}");
-        }
+        // 发布清理（2026-08-25）：调试专用方法（仅 N_DebugInspect 触发）——整体注释
+        // private void TriggerDebugInspect()
+        // {
+        //     Log.Message("[CelesFD] === Debug Inspect ===");
+        //     LogVariables();
+        //     Log.Message($"[CelesFD] CurrentTree={currentTree?.defName} CurrentNode={currentNode?.defName}");
+        // }
 
         // ═══ D6：持久化接口 ═══
         public Dictionary<string, float> ExportVariables() => new Dictionary<string, float>(variables);

@@ -49,6 +49,24 @@ namespace CelesFeature
         private static readonly System.Reflection.FieldInfo filterCategoriesField =
             AccessTools.Field(typeof(ThingFilter), "categories");
 
+        // 材质类别反射（ThingFilter.cs:69 private List<StuffCategoryDef>）——FD-G36（2026-09-02）：
+        // 原版 Allows(Thing)（:874-903）无材质检查段（品质/耐久有、材质无）；stuffCategoriesToAllow 仅在
+        // ResolveReferences :421 展开，def 级 allowedDefs 不能表达实例材质（同 Def 布制/皮制之分是实例属性）
+        private static readonly System.Reflection.FieldInfo filterStuffCatsField =
+            AccessTools.Field(typeof(ThingFilter), "stuffCategoriesToAllow");
+
+        // 装填/结算匹配入口（FD-G36 2026-09-02）：filter.Allows(Thing) + 材质类别实例级补充检查——
+        //   filter 配置了 stuffCategoriesToAllow 且物品带材质时，材质类别须命中其一；无材质物品不受约束
+        public bool EntryFilterAllows(Thing thing)
+        {
+            ThingFilter f = EntryFilter;
+            if (f == null || !f.Allows(thing)) return false;
+            var cats = (List<StuffCategoryDef>)filterStuffCatsField.GetValue(f);
+            if (cats == null || cats.Count == 0 || thing.Stuff == null) return true;
+            return thing.Stuff.stuffProps != null && thing.Stuff.stuffProps.categories != null
+                && thing.Stuff.stuffProps.categories.Any(c => cats.Contains(c));
+        }
+
         // v2 候选集解析（旧档 thingDefName 回退单元素——语义一致）
         public List<ThingDef> ThingDefs
         {

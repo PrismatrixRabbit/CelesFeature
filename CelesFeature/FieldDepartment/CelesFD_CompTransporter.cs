@@ -23,11 +23,18 @@ namespace CelesFeature
         }
 
         // 本舱对应发射平台电力（无平台或平台无电力 Comp → 视为通过）
+        // FD-G16（2026-09-02）：优先走发射 Comp 的平台缓存（gizmo 每 UI 帧重建——免全图扫描）；无发射 Comp 时兜底直查
         private bool LaunchPadPowered()
         {
+            CelesFD_CompLaunchable launchable = parent.TryGetComp<CelesFD_CompLaunchable>();
+            if (launchable != null)
+            {
+                CompPowerTrader pc = launchable.PadPower;
+                return pc == null || pc.PowerOn;
+            }
             Building pad = CelesFD_LaunchPortUtility.GetLaunchPadForPod(parent as Building);
-            CompPowerTrader pc = pad?.GetComp<CompPowerTrader>();
-            return pc == null || pc.PowerOn;
+            CompPowerTrader pcFallback = pad?.GetComp<CompPowerTrader>();
+            return pcFallback == null || pcFallback.PowerOn;
         }
     }
 

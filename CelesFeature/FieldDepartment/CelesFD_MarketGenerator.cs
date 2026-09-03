@@ -168,8 +168,11 @@ namespace CelesFeature
                     case CelesFD_MarketCategory.Precious: pools.precious.Add(def); break;
                     case CelesFD_MarketCategory.EasterEgg:
                         // 彩蛋 = 带前置条件的 Open 订单（2026-08-15 用户裁决：满足前置 → 并入 Open 池复用权重/槽位机制；
-                        //   不满足 → 不入池；不再独立生成/不占槽语义作废；无独立过期——与普通订单一致）
-                        if (CheckConditionsAgainstGlobals(def.prerequisiteConditions, gc)) pools.open.Add(def);
+                        //   不满足 → 不入池；不再独立生成/不占槽语义作废；无独立过期——与普通订单一致）。
+                        // FD-G35（2026-09-02 用户裁决"小概率出现"）：前置满足后还需 easterEggChance 概率掷骰才入池——
+                        //   原实现前置满足即必入池，测试池小+槽位≥候选数时每次刷新必出（如 L1 三出售槽对三出售候选 = 100%）
+                        if (CheckConditionsAgainstGlobals(def.prerequisiteConditions, gc) && Rand.Chance(def.easterEggChance))
+                            pools.open.Add(def);
                         break;
                     // Urgent → 模块 D（M6）不池化
                 }

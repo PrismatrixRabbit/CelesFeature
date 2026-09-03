@@ -198,17 +198,6 @@ namespace CelesFeature
             }
         }
         // ============================================================
-        //  蓝图预览（PlaceWorker 委托）：范围圈
-        //  参照 CompAffectedByFacilities.DrawLinesToPotentialThingsToLinkTo 静态方法模式
-        // ============================================================
-        public static void DrawPlacementPreview(ThingDef def, IntVec3 center, Map map)
-        {
-            CompProperties_ThreadProducer props = def.GetCompProperties<CompProperties_ThreadProducer>();
-            if (props != null)
-                GenDraw.DrawRadiusRing(center, props.connectRadius);
-        }
-
-        // ============================================================
         //  F-09: 选中连接线渲染
         // ============================================================
         public override void PostDrawExtraSelectionOverlays()

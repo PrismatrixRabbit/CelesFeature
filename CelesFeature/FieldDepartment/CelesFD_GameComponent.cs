@@ -23,6 +23,32 @@ namespace CelesFeature
         public bool RelocationAsked;     // 搬迁询问标志（全局仅一次，F5）
         public int BeaconCooldownStartTick = -1;   // 信标站冷却开始时刻（-1 = 未冷却；F6）
 
+        // ═══ M5 后半段：开局任务链状态机（2026-08-25） ═══
+        public bool CrystalEventTriggered;   // 晶体坠落已触发（道歉信 3700 起算前置）
+        public long CrystalEventTick;        // 晶体事件触发时刻（3700 起算=事件触发时刻，用户裁决）
+        public bool ApologyTriggered;        // 道歉信已触发
+        public long ApologyTriggerTick;      // 道歉信触发时刻（2 象过期起算）
+        public int ApologyScenario;          // 剧本分组（0-4，道歉信触发时记录；B 树差分）
+        public bool ApologySkipped;          // 道歉信被截断（敌对/派系缺失，2026-08-29 修复）——独立终止标志：
+                                             //   终止 3700 tick 空转检查 + 防和解后补触发；不污染 ApologyTriggered（防对话树误判进道歉树）
+        // ApologyViewed 无字段——纯对话变量（道歉树 entryComps SetVariable 置位，引擎持久化；根树 conditions 读取）
+        public bool BeaconEstablished;       // 信标站已触发（首建发信器，原 F3 第 7 天改挂载）
+
+        // 事件执行失败重试状态（FD-G08/G09 修复 2026-09-02：有限重试 3 次 + 日志上限；
+        // [Unsaved]——会话级状态，读档后允许重新尝试，无害）
+        [Unsaved]
+        private int firstAntennaFails;       // 首建发信器→信标站事件失败计数
+        [Unsaved]
+        private bool firstAntennaAbandoned;  // 本会话放弃标志（3 次失败后置位）
+        [Unsaved]
+        private int apologyFails;            // 道歉信事件失败计数
+        [Unsaved]
+        private bool apologyAbandoned;       // 本会话放弃标志（3 次失败后置位）
+
+        // 开局任务链参数（硬编码占位，后续 XML 化）
+        public const int ApologyDelayTicks = 3700;        // 晶体→道歉信间隔（比较式定时，dev 快进跳变兼容）
+        public const int ApologyExpireTicks = 1800000;    // 道歉树 2 象过期（1 象 = 900,000 ticks）
+
         // F6 冷却参数（硬编码占位，后续 XML 化）
         public const int BeaconCooldownTicks = 1800000;        // 冷却期 30 天（1,800,000 tick）
         public const int BeaconCooldownCheckInterval = 1000;   // 期满后随机判定间隔
@@ -55,8 +81,19 @@ namespace CelesFeature
         public List<CelesFD_OrderArchiveEntry> OrderArchive = new List<CelesFD_OrderArchiveEntry>();   // 外勤档案（§5.7：超 20 删最旧；M7 物流页历史显示）
         public List<CelesFD_LogisticsOrder> InTransitList = new List<CelesFD_LogisticsOrder>();   // M7 在途物流单（出售物流：到期交付；标准 24h/加急 1h）
         public CelesFD_DialogueEngine DialogueEngine = new CelesFD_DialogueEngine();
+
+        // ═══ W-1：支援系统状态（武备三态：available/pending；draft 为 UI 草稿不存档——§2.3） ═══
+        public List<CelesFD_SupportState> SupportStates = new List<CelesFD_SupportState>();
+
+        // ═══ W-2a：支援信标注册表（[Unsaved]——信标本体随地图存档，注册表由信标 SpawnSetup/Destroy 维护；
+        //     Alert_SupportIncoming 数据源；含 null/Destroyed 惰性清理，遍历方自防） ═══
+        [Unsaved]
+        public readonly List<CelesFD_SupportBeacon> SupportBeacons = new List<CelesFD_SupportBeacon>();
         
-        public CelesFD_GameComponent(Game game) { }
+        public CelesFD_GameComponent(Game game)
+        {
+            CelesFD_SupportAlertSlots.ClearAll();   // 跨存档静态槽位清理（每次新游戏/读档均执行）
+        }
 
         public override void ExposeData()
         {
@@ -82,12 +119,21 @@ namespace CelesFeature
             Scribe_Values.Look(ref FailCount, "CFD_FailCount", 0);
             Scribe_Collections.Look(ref OrderArchive, "CFD_OrderArchive", LookMode.Deep);
             Scribe_Collections.Look(ref InTransitList, "CFD_InTransitList", LookMode.Deep);
+            Scribe_Collections.Look(ref SupportStates, "CFD_SupportStates", LookMode.Deep);
+            Scribe_Values.Look(ref CrystalEventTriggered, "CFD_CrystalEventTriggered", false);
+            Scribe_Values.Look(ref CrystalEventTick, "CFD_CrystalEventTick", 0L);
+            Scribe_Values.Look(ref ApologyTriggered, "CFD_ApologyTriggered", false);
+            Scribe_Values.Look(ref ApologyTriggerTick, "CFD_ApologyTriggerTick", 0L);
+            Scribe_Values.Look(ref ApologyScenario, "CFD_ApologyScenario", 0);
+            Scribe_Values.Look(ref ApologySkipped, "CFD_ApologySkipped", false);
+            Scribe_Values.Look(ref BeaconEstablished, "CFD_BeaconEstablished", false);
             if (MarketOrders == null) MarketOrders = new List<CelesFD_Order>();
             if (AcquiredLevels == null) AcquiredLevels = new HashSet<int>();
             if (ShoppingCart == null) ShoppingCart = new List<CelesFD_Order>();
             if (DialogueHistory == null) DialogueHistory = new List<CelesFD_DialogueEntry>();
             if (OrderArchive == null) OrderArchive = new List<CelesFD_OrderArchiveEntry>();
             if (InTransitList == null) InTransitList = new List<CelesFD_LogisticsOrder>();
+            if (SupportStates == null) SupportStates = new List<CelesFD_SupportState>();   // FD-G12（2026-09-02）：对称补齐 null 守卫
             // 对话引擎持久化（D6）
             var savedVars = DialogueEngine.ExportVariables();
             Scribe_Collections.Look(ref savedVars, "CFD_DialogueVars", LookMode.Value, LookMode.Value);
@@ -151,6 +197,98 @@ namespace CelesFeature
             TryCheckMarketRefresh();
             TryCheckOrderDeadlines();   // M6-2：逾期自动违约
             TryCheckLogisticsArrivals();   // M7-3：在途物流到期交付
+            TryCheckApologyLetter();       // 开局任务链：3700 定时道歉信
+            TryCheckFirstAntenna();        // 开局任务链：首建发信器 → 信标站生成
+            TickSupportApprovals();        // W-1：武备申请审批到期 → pending 转 available
+        }
+
+        // ═══ 开局任务链：道歉信定时触发（3700 比较式——dev 快进跳变后条件立即成立；250 tick 节流精度足够） ═══
+        private void TryCheckApologyLetter()
+        {
+            if (!CrystalEventTriggered || ApologyTriggered || ApologySkipped || apologyAbandoned) return;
+            if (Find.TickManager.TicksGame - CrystalEventTick < ApologyDelayTicks) return;
+            // 敌对截断（用户裁决：确认星铃非敌对，敌对则截断后续事件——该局道歉信永久不触发，彩蛋树兜底）
+            // 2026-08-29 修复：置 ApologySkipped 终止检查（此前每 250 tick 空转 + 刷日志；且和解后补触发不符"截断"语义）
+            var beacon = CelesFD_BeaconUtility.BeaconFaction;
+            if (beacon == null || beacon.HostileTo(Faction.OfPlayer))
+            {
+                ApologySkipped = true;
+                Log.Message("[CelesFD] Apology letter skipped (beacon faction missing or hostile)");
+                return;
+            }
+            var parms = new IncidentParms { target = Find.World, faction = beacon };
+            if (!CelesFD_DefOf.CelesFD_ApologyLetter.Worker.TryExecute(parms))
+            {
+                // FD-G09 修复（2026-09-02 用户裁决）：重试上限 3 + 日志上限（首次失败与放弃各一条；
+                // 原为每 250 tick 无限重试 + Warning 刷屏）。ApologyTriggered 由 Worker 成功时置位
+                apologyFails++;
+                if (apologyFails == 1)
+                    Log.Warning("[CelesFD] Apology letter execution failed; retrying (up to 3 attempts)");
+                if (apologyFails >= 3)
+                {
+                    apologyAbandoned = true;
+                    Log.Warning("[CelesFD] Apology letter failed 3 times; giving up this session (research path fallback remains)");
+                }
+            }
+        }
+
+        // ═══ 开局任务链：首建发信器监听（原 F3 第 7 天信标站事件改挂载——持续监听直到首建，研究路径兜底） ═══
+        private void TryCheckFirstAntenna()
+        {
+            if (BeaconEstablished || firstAntennaAbandoned) return;
+            ThingDef antennaDef = CelesFD_DefOf.CelesFD_Antenna;
+            if (antennaDef == null) return;
+            foreach (Map map in Find.Maps)
+                if (map.listerBuildings.AllBuildingsColonistOfDef(antennaDef).Count > 0)
+                {
+                    var parms = new IncidentParms { target = Find.World, faction = CelesFD_BeaconUtility.BeaconFaction };
+                    if (!CelesFD_DefOf.CelesFD_BeaconSignal.Worker.TryExecute(parms))
+                    {
+                        // FD-G08 修复（2026-09-02 用户裁决）：失败不置位 BeaconEstablished——随 250 tick 轮询重试，
+                        // 3 次失败后放弃本会话并 Warning（原：先置位 → 单次失败 = 该局信标站永久丢失）
+                        firstAntennaFails++;
+                        if (firstAntennaFails >= 3)
+                        {
+                            firstAntennaAbandoned = true;
+                            Log.Warning("[CelesFD] Beacon signal failed 3 times after first antenna; giving up this session");
+                        }
+                        return;
+                    }
+                    BeaconEstablished = true;
+                    Log.Message("[CelesFD] First antenna built → beacon signal triggered");
+                    return;
+                }
+        }
+
+        // ═══ 开局任务链：打开发信器 UI 前刷新对话变量（根树 conditions 依赖；forcePause 下打开时稳定） ═══
+        // 单向同步（GameComponent 字段 → 对话变量）：ApologyTriggered/ApologyScenario（Worker 写字段，对话树只读）
+        // ApologyViewed/EasterEggDone 为纯对话变量（道歉树/彩蛋树 entryComps/sets 写，引擎持久化——防双向不同步）
+        // 动态计算：Level（有效等级 v4.7）/ Relation（PlayerRelationKind 三档——用户裁决仅看关系不看好感度 int）/ ApologyExpired（比较式）
+        public void RefreshDialogueVars()
+        {
+            var engine = DialogueEngine;
+            if (engine == null) return;
+            engine.SetVariable("ApologyTriggered", ApologyTriggered ? 1f : 0f);
+            engine.SetVariable("ApologyScenario", ApologyScenario);
+            // 判定结构全部在树 XML（RPN：Not/And/Or 引擎内求值，2026-08-25）——此处仅同步状态变量
+            engine.SetVariable("Level", GetEffectiveLevel());
+            engine.SetStringVariable("playerFactionName", Faction.OfPlayer?.Name);   // 主树问候插值（无派系 → null 移除）
+            var beacon = CelesFD_BeaconUtility.BeaconFaction;
+            float relation = 0f;   // 0 敌 / 1 中 / 2 盟
+            if (beacon != null)
+            {
+                switch (beacon.PlayerRelationKind)
+                {
+                    case FactionRelationKind.Hostile: relation = 0f; break;
+                    case FactionRelationKind.Neutral: relation = 1f; break;
+                    case FactionRelationKind.Ally: relation = 2f; break;
+                }
+            }
+            engine.SetVariable("Relation", relation);
+            // 过期标志（比较式计算——动态时间差不存持久化变量；2 象 = 1,800,000 ticks；ApologyViewed 读对话变量）
+            engine.SetVariable("ApologyExpired",
+                ApologyTriggered && engine.GetVariable("ApologyViewed") == 0f
+                    && Find.TickManager.TicksGame - ApologyTriggerTick >= ApologyExpireTicks ? 1f : 0f);
         }
 
         // ═══ M7-3：在途物流到期交付（自建 tick 计时——天然 dev 快进兼容；倒序遍历防索引错位） ═══
@@ -482,10 +620,16 @@ namespace CelesFeature
         public bool TryPlaceShoppingOrder(bool expedited, bool notifyArrival)
         {
             if (ShoppingCart.Count == 0) return false;
-            float creditTotal = ShoppingCart.Sum(o => o.CalcPriceCredit());
-            float keyTotal = ShoppingCart.Sum(o => o.CalcPriceKey());
-            float silverV = CelesFD_ShippingUtility.CalcTotalValue(ShoppingCart);
-            float massW = CelesFD_ShippingUtility.CalcTotalMass(ShoppingCart);
+            // FD-G11 修复（2026-09-02）：先过滤有效订单（FirstThingDef 非空）再计价扣款——
+            // 原：按全部购物车求和扣款，null-def 订单付款不发货且不移出市场（可重复购买重复扣款）；全 null 时已扣款无退款
+            List<CelesFD_Order> validOrders = new List<CelesFD_Order>();
+            foreach (CelesFD_Order o in ShoppingCart)
+                if (o.FirstThingDef != null) validOrders.Add(o);
+            if (validOrders.Count == 0) return false;   // 全部无效（Def 已删）：不扣款直接失败
+            float creditTotal = validOrders.Sum(o => o.CalcPriceCredit());
+            float keyTotal = validOrders.Sum(o => o.CalcPriceKey());
+            float silverV = CelesFD_ShippingUtility.CalcTotalValue(validOrders);
+            float massW = CelesFD_ShippingUtility.CalcTotalMass(validOrders);
             float shipping = CelesFD_ShippingUtility.CalcShippingCost(silverV, massW) * (expedited ? 2f : 1f);   // 加急 2x（确认）
             float creditBase = creditTotal + keyTotal * KeyToCredit;
             float tax = CelesFD_ShippingUtility.CalcTax(creditBase);   // 税归信用额侧（用户裁决：密钥非特殊高价值货币）
@@ -506,10 +650,9 @@ namespace CelesFeature
             if (keyPay > 0) ModifyQuantumKey(-keyPay);
             // TradeVolume（挂账裁决：成功结算按 信用额+密钥×汇率，收购/贩售统一）
             ModifyTradeVolume(Mathf.RoundToInt(creditTotal + keyTotal * KeyToCredit));
-            // 生成物流单（每条目一单——各自独立空投；标准 24h = 1440000 / 加急 1h = 60000）
+            // 生成物流单（同批次合并：一个物流单多物品——一次空投、一个物流卡片，用户裁决；时长 2026-08-15 定稿：加急 1h=2500 / 标准 24h=60000）
             long now = Find.TickManager.TicksGame;
-            long duration = expedited ? 2500L : 60000L;   // 2026-08-15 修正：加急 1h=2500 / 标准 24h=60000（草案为准）
-            // 同批次合并：一个物流单（多物品）——一次空投、一个物流卡片（用户裁决）
+            long duration = expedited ? 2500L : 60000L;
             var lo = new CelesFD_LogisticsOrder
             {
                 startTick = now,
@@ -517,16 +660,13 @@ namespace CelesFeature
                 expedited = expedited,
                 notifyArrival = notifyArrival
             };
-            foreach (CelesFD_Order o in ShoppingCart)
+            foreach (CelesFD_Order o in validOrders)
             {
-                ThingDef td = o.FirstThingDef;
-                if (td == null) continue;
                 // 材质/品质快照随订单复制（2026-08-15：发货正确性——修复 madeFromStuff 报错）
-                lo.items.Add(new CelesFD_LogisticsItem(td.defName, o.amount,
+                lo.items.Add(new CelesFD_LogisticsItem(o.FirstThingDef.defName, o.amount,
                     o.stuffDefName, o.qualityCategory, o.qualitySet));
                 MarketOrders.Remove(o);   // 购买后卡片移出市场（用户裁决：不可重复购买）
             }
-            if (lo.items.Count == 0) return false;
             InTransitList.Add(lo);
             ShoppingCart.Clear();
             if (notifyArrival)
@@ -646,6 +786,63 @@ namespace CelesFeature
             CurrentNewsIndex = idx;
             lastNewsIndex = idx;
             Log.Message("[CelesFD] News refreshed -> index " + idx + " (" + def.newsPool[idx] + ")");
+        }
+
+        // ═══ W-1：支援系统（§2.3 三态模型；审批延迟到期转可用；人员侧 R 系列扩展） ═══
+
+        // 状态查询（懒创建：GetSupportState(def, true) 建新条目）
+        public CelesFD_SupportState GetSupportState(CelesFD_SupportDef def, bool createIfMissing = true)
+        {
+            for (int i = 0; i < SupportStates.Count; i++)
+                if (SupportStates[i].defName == def.defName) return SupportStates[i];
+            if (!createIfMissing) return null;
+            CelesFD_SupportState s = new CelesFD_SupportState { defName = def.defName };
+            SupportStates.Add(s);
+            return s;
+        }
+
+        public int AvailableCount(CelesFD_SupportDef def) => GetSupportState(def, false)?.available ?? 0;
+        public int PendingCount(CelesFD_SupportDef def) => GetSupportState(def, false)?.pending ?? 0;
+
+        // 施放消耗（Verb_SupportCall.TryCastShot 调用）：前摇走完后原子检测 + 扣减——防两系统并发调用后数量不足
+        public bool TryConsumeSupport(CelesFD_SupportDef def)
+        {
+            CelesFD_SupportState s = GetSupportState(def, false);
+            if (s == null || s.available <= 0) return false;
+            s.available--;
+            return true;
+        }
+
+        // W-3 武备页提交：draft（尝试申请的）入账 pending + 审批计时起点；上限 maxTotal
+        public bool TrySubmitSupportRequest(CelesFD_SupportDef def, int draft)
+        {
+            if (draft <= 0) return false;
+            CelesFD_SupportState s = GetSupportState(def, true);
+            if (s.available + s.pending + draft > def.maxTotal) return false;
+            s.pending += draft;
+            s.pendingSinceTick = Find.TickManager.TicksGame;
+            return true;
+        }
+
+        // 审批到期轮询（250 tick 节流内）：pendingSinceTick 起算 applyDelayHours 到期 → pending 全部转 available
+        // （比较式——dev 快进跳变后条件立即成立，G 系列纪律）
+        private void TickSupportApprovals()
+        {
+            for (int i = 0; i < SupportStates.Count; i++)
+            {
+                CelesFD_SupportState s = SupportStates[i];
+                if (s.pending <= 0 || s.pendingSinceTick < 0) continue;
+                CelesFD_SupportDef def = DefDatabase<CelesFD_SupportDef>.GetNamedSilentFail(s.defName);
+                if (def == null) continue;   // Def 缺失（删档）→ 状态保留待补
+                long delayTicks = (long)(def.applyDelayHours * 2500L);   // 1 游戏小时 = 2500 ticks
+                if (delayTicks <= 0 || Find.TickManager.TicksGame - s.pendingSinceTick >= delayTicks)
+                {
+                    s.available += s.pending;
+                    s.pending = 0;
+                    s.pendingSinceTick = -1;
+                    Log.Message("[CelesFD] Support approved: " + def.defName + " available=" + s.available);
+                }
+            }
         }
     }
 }

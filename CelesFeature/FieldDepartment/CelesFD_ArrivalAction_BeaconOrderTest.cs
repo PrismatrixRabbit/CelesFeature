@@ -66,7 +66,7 @@ namespace CelesFeature
                         {
                             // 匹配升级（2026-08-15）：filter.Allows(Thing) 含材质/品质/耐久校验（收购端装填限定一致，ThingFilter.cs:874）
                             CelesFD_Order target = accepted.FirstOrDefault(o => o.remaining > 0
-                                && o.EntryFilter != null && o.EntryFilter.Allows(thing));   // v2 候选集匹配
+                                && o.EntryFilterAllows(thing));   // v2 候选集匹配 + FD-G36 材质实例级检查
                             if (target == null) break;   // 无订单可收 → 剩余丢弃
                             int take = Mathf.Min(left, target.remaining);
                             target.remaining -= take;

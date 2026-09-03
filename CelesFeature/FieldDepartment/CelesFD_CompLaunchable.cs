@@ -152,25 +152,30 @@ namespace CelesFeature
             if (gc == null) return group.Any(t => t.GetDirectlyHeldThings().Any());
             // 已接取订单需求物集合（v2：候选集展开——"任意此类商品"；材质/耐久装填侧校验裁决不做，结算端直接匹配）
             var wanted = new HashSet<ThingDef>();
+            // 未介入的突发单（FD-G17 修复 2026-09-02：标记循环独立于提前返回——原首个匹配物即 return，
+            // 舱内装 A、B 两个突发单物资时先匹配 A 则 B 永不被标记介入，B 逾期按未介入自动消失）
+            var unmarkedUrgent = new List<CelesFD_Order>();
             foreach (CelesFD_Order o in gc.MarketOrders)
-                if (o.state == CelesFD_OrderState.Accepted && o.remaining > 0)
-                    foreach (ThingDef d in o.ThingDefs) wanted.Add(d);
+            {
+                if (o.state != CelesFD_OrderState.Accepted || o.remaining <= 0) continue;
+                foreach (ThingDef d in o.ThingDefs) wanted.Add(d);
+                if (!o.intervened && o.TemplateDef != null && o.TemplateDef.category == CelesFD_MarketCategory.Urgent)
+                    unmarkedUrgent.Add(o);
+            }
             if (wanted.Count == 0) return group.Any(t => t.GetDirectlyHeldThings().Any());   // 无订单回退非空
+            bool anyMatched = false;
             foreach (CompTransporter t in group)
             {
                 foreach (Thing thing in t.GetDirectlyHeldThings())
                 {
                     if (!wanted.Contains(thing.def)) continue;
-                    // M6-6：突发单介入标记（舱内含突发需求物 = 开始装载 → 逾期计入成败，§5.7）
-                    foreach (CelesFD_Order o in gc.MarketOrders)
-                        if (o.state == CelesFD_OrderState.Accepted && !o.intervened
-                            && o.TemplateDef != null && o.TemplateDef.category == CelesFD_MarketCategory.Urgent
-                            && o.ThingDefs.Contains(thing.def))
-                            o.intervened = true;
-                    return true;
+                    anyMatched = true;
+                    // M6-6：突发单介入标记（舱内含突发需求物 = 开始装载 → 逾期计入成败，§5.7）——全量标记
+                    foreach (CelesFD_Order o in unmarkedUrgent)
+                        if (o.ThingDefs.Contains(thing.def)) o.intervened = true;
                 }
             }
-            return false;
+            return anyMatched;
         }
 
         // ============ 信标站目标 ============
@@ -288,11 +293,13 @@ namespace CelesFeature
             List<CompTransporter> group = Transporter.TransportersInGroup(parent.Map);
             if (group == null)
             {
-                return PadPowerOf(parent as Building)?.PowerOn != false;
+                return PadPower?.PowerOn != false;
             }
             foreach (CompTransporter t in group)
             {
-                CompPowerTrader pc = PadPowerOf(t.parent as Building);
+                // FD-G16：组内成员优先走各自发射 Comp 的平台缓存；无我方发射 Comp 的组员（理论不存在）兜底直查
+                CelesFD_CompLaunchable comp = t.parent.TryGetComp<CelesFD_CompLaunchable>();
+                CompPowerTrader pc = comp != null ? comp.PadPower : PadPowerOf(t.parent as Building);
                 if (pc != null && !pc.PowerOn)
                 {
                     return false;
@@ -301,20 +308,36 @@ namespace CelesFeature
             return true;
         }
 
-        // 平台充能参数（轻量 Comp：仅前摇时长——挂平台）
+        // 平台充能参数（轻量 Comp：仅前摇时长——挂平台）；FD-G16：经平台缓存解析（原直查全图扫描）
         private CelesFD_CompProperties_LaunchCharge ChargeProps
         {
             get
             {
-                Building pad = CelesFD_LaunchPortUtility.GetLaunchPadForPod(parent as Building);
+                Building pad = PadBuildingOf(parent as Building);
                 return (pad?.GetComp<CelesFD_CompLaunchCharge>()?.Props) as CelesFD_CompProperties_LaunchCharge;
             }
         }
 
-        // 平台电力（原版 CompPowerTrader——发射耗电 = PowerConsumption / 待机 = idlePowerDraw，直接读原版字段）
-        private CompPowerTrader PadPower => PadPowerOf(parent as Building);
+        // FD-G16 修复（2026-09-02）：平台引用缓存——舱↔平台配对由对接口几何固定（双方 Spawned 期间不变；
+        // 平台变更必经 Destroy→重建，以 Destroyed 失效重查兜底）。修复前 GetLaunchPadForPod 每次全图遍历
+        // allBuildingsColonist，被充电前摇每 tick（PadPower + AllPadsPowered 组内遍历）放大为最显著 Tick 热点
+        [Unsaved]
+        private Building cachedPad;
 
-        // 舱体 → 平台 → CompPowerTrader（平台无电力 Comp 时视为恒满足）
+        // 平台电力（原版 CompPowerTrader——发射耗电 = PowerConsumption / 待机 = idlePowerDraw，直接读原版字段）
+        // internal：CelesFD_CompTransporter gizmo 电力检查共用缓存（免选中期全图扫描）
+        internal CompPowerTrader PadPower => PadBuildingOf(parent as Building)?.GetComp<CompPowerTrader>();
+
+        // 舱体 → 平台（缓存）→ CompPowerTrader（平台无电力 Comp 时视为恒满足）
+        private Building PadBuildingOf(Building pod)
+        {
+            if (pod == null) return null;
+            if (cachedPad == null || cachedPad.Destroyed)
+                cachedPad = CelesFD_LaunchPortUtility.GetLaunchPadForPod(pod);
+            return cachedPad;
+        }
+
+        // 舱体 → 平台（无缓存直查——AllPadsPowered 对无我方发射 Comp 的组员兜底；正常路径不走）
         private static CompPowerTrader PadPowerOf(Building pod)
         {
             if (pod == null)
@@ -327,7 +350,7 @@ namespace CelesFeature
 
         private void SetPadPower(float watts)
         {
-            CompPowerTrader pc = PadPowerOf(parent as Building);
+            CompPowerTrader pc = PadPower;
             if (pc != null)
             {
                 pc.PowerOutput = -watts; // 负 = 耗电

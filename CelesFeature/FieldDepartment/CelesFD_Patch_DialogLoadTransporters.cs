@@ -97,8 +97,7 @@ namespace CelesFeature
             foreach (CelesFD_Order o in gc.MarketOrders)
             {
                 if (o.state != CelesFD_OrderState.Accepted || o.remaining <= 0) continue;
-                ThingFilter f = o.EntryFilter;
-                if (f != null && f.Allows(thing)) return true;
+                if (o.EntryFilterAllows(thing)) return true;   // FD-G36（2026-09-02）：含材质类别实例级检查（原版 Allows(Thing) 无材质段）
             }
             return false;
         }
@@ -119,6 +118,10 @@ namespace CelesFeature
             {
                 if (t.AnyThing == null || t.CountToTransfer <= 0) continue;
                 ThingDef def = t.AnyThing.def;
+                // FD-G32 修复（2026-09-02，测试 a/b 判别定位）：物品不属于任何池订单 → 不受池约束管辖，
+                // 跳过（该类物品已由前段 per-def wanted 钳制正确治理——单物订单跨单求和上限）。
+                // 原实现误入"无订单可收"分支被 AdjustTo(0) 清零：类别单+单物单共存时单物物品全部失效
+                if (!orders.Any(o => o.ThingDefs.Contains(def))) continue;
                 int left = t.CountToTransfer;
                 foreach (CelesFD_Order o in orders)
                 {

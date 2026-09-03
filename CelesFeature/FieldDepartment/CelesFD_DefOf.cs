@@ -25,5 +25,17 @@ namespace CelesFeature
         public static IncidentDef CelesFD_RelocationAcceptedSignal;
         public static IncidentDef CelesFD_RelocationDoneSignal;
         public static IncidentDef CelesFD_BeaconMovedSignal;
+
+        // W-1：支援系统
+        public static ThingDef CelesFD_SupportCaller;
+        public static JobDef CelesFD_SupportCall;
+        // W-1.5：投掷式呼叫信标
+        public static ThingDef CelesFD_SupportBeacon;
+
+        // 开局任务链（2026-08-25）
+        public static ThingDef CelesFD_Antenna;
+        public static IncidentDef CelesFD_BeaconSignal;
+        public static IncidentDef CelesFD_InitialCrystalOrbitDrop;
+        public static IncidentDef CelesFD_ApologyLetter;
     }
 }

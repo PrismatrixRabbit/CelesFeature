@@ -118,11 +118,12 @@ namespace CelesFeature
         // [事实] 原版 API：HediffSet.GetFirstHediffOfDef（HediffSet.cs:531）+ AddDirect（HediffSet.cs:310），无 GetOrAddHediff
         // [事实] 遍历快照：AddDirect 触发 CheckForStateChange → 倒地重伤 pawn 死亡 → DeRegisterPawn 修改 AllPawnsSpawned → 直接 foreach 抛
         // "Collection was modified"（实测异常）——ToList 快照 + Destroyed 防御
+        // [事实] 抗性减免（用户裁决）：对齐原版施加公式 × max(1−ToxicResistance,0) × max(1−ToxicEnvironmentResistance,0)
+        //（ToxicUtility.cs:39-40）——范围来源语义同环境毒素，两 stat 相乘
         private void ApplyHediffToPawns()
         {
             if (Props.pawnHediff == null)
                 return;
-            float severityGain = Props.hediffSeverityPerDay * (250f / 60000f);
             foreach (Pawn pawn in parent.Map.mapPawns.AllPawnsSpawned.ToList())
             {
                 if (pawn.Destroyed || !pawn.Spawned)
@@ -131,17 +132,22 @@ namespace CelesFeature
                     continue;
                 if (!pawn.Position.InHorDistOf(parent.Position, currentRadius))
                     continue;
+                float gain = Props.hediffSeverityPerDay * (250f / 60000f)
+                    * Mathf.Max(1f - pawn.GetStatValue(StatDefOf.ToxicResistance), 0f)
+                    * Mathf.Max(1f - pawn.GetStatValue(StatDefOf.ToxicEnvironmentResistance), 0f);
+                if (gain <= 0f)
+                    continue;
                 Hediff hediff = pawn.health.hediffSet.GetFirstHediffOfDef(Props.pawnHediff);
                 if (hediff == null)
                 {
                     hediff = HediffMaker.MakeHediff(Props.pawnHediff, pawn);
                     // [事实] 根因：Hediff.PostMake 应用 def.initialSeverity（Hediff.cs:548），默认 0.5（HediffDef.cs:28），
-                    // ToxicBuildup 未覆写 → 新施加即 50%（"直接进入中等中毒"）——显式压低从 0 缓慢累积
+                    // 未覆写 → 新施加即 50%——显式压低从 0 缓慢累积
                     // [事实] 0 会被自动移除（hediff 严重度 0 无法存活）——至少 0.001 保底起步（实测确认）
                     hediff.Severity = 0.001f;
                     pawn.health.hediffSet.AddDirect(hediff);
                 }
-                hediff.Severity += severityGain;
+                hediff.Severity += gain;
             }
         }
 

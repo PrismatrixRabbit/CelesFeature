@@ -36,11 +36,21 @@ namespace CelesFeature
         // 下半部遮挡的保证 = 文本 rect 高度 ≥ 实测 lineHeight（修复 2026-08-15：废除"字号×1.4"自拟假设——
         //   原版行高 = 运行时实测缓存（Text.cs:194-200 CalcHeight("W",999f)）；中文 fallback 字体的实际行高
         //   不可由固定比例预测，布局一律以 ScaledLineHeight() 实测值驱动）
+        // G22 修复（归 W-3）：按 size 缓存 GUIStyle——原每次调用 new GUIStyle（卡片密集页每帧数十至上百次分配 GC 压力）
+        // 缓存模式同 ScaledLineHeight（:50-61 同文件先例）；GUIStyle 为引用类型且仅读使用，缓存安全
+        private static readonly Dictionary<int, GUIStyle> scaledStyles = new Dictionary<int, GUIStyle>();
+
         public static GUIStyle GetScaledStyle(float size)
         {
-            GUIStyle style = new GUIStyle(Text.CurFontStyle);
-            style.fontSize = Mathf.Max(4, Mathf.FloorToInt(size));
-            style.wordWrap = false;
+            int key = Mathf.FloorToInt(size);
+            GUIStyle style;
+            if (!scaledStyles.TryGetValue(key, out style))
+            {
+                style = new GUIStyle(Text.CurFontStyle);
+                style.fontSize = Mathf.Max(4, key);
+                style.wordWrap = false;
+                scaledStyles[key] = style;
+            }
             return style;
         }
 

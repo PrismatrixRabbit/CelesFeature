@@ -53,6 +53,10 @@ namespace CelesFeature
         public bool expedited;         // 加急（四节点显示）
         public bool notifyArrival;     // 订阅到货提醒（下单时勾选快照——letter/Alert 控制）
 
+        // W-4（2026-09-04 用户需求）：即将抵达倒计时——两阶段交付（机制预演）
+        public long countdownStartTick = -1;   // -1 = 未进入倒计时（阶段 1 运输中）；>0 = 已进入（阶段 2）
+        public const int CountdownTicks = 300; // 倒计时时长 5 秒（对照支援 arrivalDelayTicks 默认 300）
+
         public void ExposeData()
         {
             Scribe_Collections.Look(ref items, "items", LookMode.Deep);
@@ -60,6 +64,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref arrivalTick, "arrivalTick", 0L);
             Scribe_Values.Look(ref expedited, "expedited", false);
             Scribe_Values.Look(ref notifyArrival, "notifyArrival", false);
+            Scribe_Values.Look(ref countdownStartTick, "countdownStartTick", -1L);
             if (items == null) items = new List<CelesFD_LogisticsItem>();
         }
     }

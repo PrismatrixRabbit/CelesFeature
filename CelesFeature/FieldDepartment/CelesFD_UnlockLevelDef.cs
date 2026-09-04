@@ -22,6 +22,7 @@ namespace CelesFeature
         public CelesFD_SlotConfig preciousSlots;   // 珍贵固有槽位
         public float marketPreciousChance;     // 珍贵随机概率（每轮 -0.35，挤占对应方向开放槽）
         public int maxTradeOrder;              // 最大承接订单量（M3.5 用）
+        public int weaponQuotaPerQuadrum = 4; // 每象武备数量上限（W-3 N3——零级 4 / 一级 8；XML 可调）
     }
 
     // 开放等级顺序配置（Phase 2 遍历判定用，首项强制兜底）

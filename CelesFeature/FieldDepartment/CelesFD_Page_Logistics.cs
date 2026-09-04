@@ -204,14 +204,21 @@ namespace CelesFeature
         }
 
         // 超宽 "..." 截断（不换行——用户规格）
+        // G23 修复（归 W-3）：二分截断——同 OrderCard.TruncateText 改造
         private static string TruncateText(string text, float maxWidth)
         {
             GUIStyle style = CelesFD_UIConfig.GetScaledStyle(CelesFD_UIConfig.FontSub);
             if (text == null || style.CalcSize(new GUIContent(text)).x <= maxWidth) return text;
-            string cut = text;
-            while (cut.Length > 1 && style.CalcSize(new GUIContent(cut + "...")).x > maxWidth)
-                cut = cut.Substring(0, cut.Length - 1);
-            return cut + "...";
+            int lo = 1, hi = text.Length;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                if (style.CalcSize(new GUIContent(text.Substring(0, mid) + "...")).x <= maxWidth)
+                    lo = mid;
+                else
+                    hi = mid - 1;
+            }
+            return text.Substring(0, lo) + "...";
         }
 
         // 正上子页：物流系统状态（数据源 CelesFD_BeaconUtility.GetStations）

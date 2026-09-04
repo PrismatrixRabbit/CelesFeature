@@ -32,9 +32,11 @@ namespace CelesFeature
                 Destroy();
                 return;
             }
-            if (supportDef == null || gc == null || !gc.TryConsumeSupport(supportDef))
+            if (supportDef == null || gc == null || !gc.TryUseSupport(supportDef))
             {
                 // 失败：仅销毁（不生成信标/光柱/不触发）——不调 base.Impact（其生成 spawnsThingDef）
+                // R1 拆两层（W-3）：TryUseSupport = 冷却→额度→扣次→副作用（冷却启动+额度计数）
+                // 额度耗尽时此处静默失败——FloatMenu 侧已灰显+提示（双侧限定的激活侧拦截）
                 Destroy();
                 return;
             }

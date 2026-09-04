@@ -520,7 +520,18 @@ namespace CelesFeature
         private static void DrawScaledLabel(Rect rect, string text, float size)
         {
             Text.Font = GameFont.Small;
-            GUI.Label(rect, text, CelesFD_UIConfig.GetScaledStyle(size));
+            GUIStyle style = CelesFD_UIConfig.GetScaledStyle(size);
+            // G22 缓存 alignment 冻结在创建时——非默认 Text.Anchor 需克隆（交易页右对齐修复）
+            if (Text.Anchor != TextAnchor.UpperLeft)
+            {
+                var clone = new GUIStyle(style);
+                clone.alignment = Text.Anchor;
+                GUI.Label(rect, text, clone);
+            }
+            else
+            {
+                GUI.Label(rect, text, style);   // 常见路径零克隆（G22 优化保留）
+            }
         }
 
         // 双币种金额格式化（②：恒显双币种——保留密钥显示空间，密钥为 0 时显示"0 密钥"）
@@ -593,10 +604,10 @@ namespace CelesFeature
             string cText = BuildFloorText(credit);
             string kText = BuildFloorText(key);
             string full = cText + " 信用额 + " + kText + " 密钥";
-            GUIStyle style = CelesFD_UIConfig.GetScaledStyle(size);
-            Text.Anchor = TextAnchor.MiddleRight;
+            // G22 缓存 alignment 冻结——克隆 + 显式右对齐（交易页对齐修复）
+            GUIStyle style = new GUIStyle(CelesFD_UIConfig.GetScaledStyle(size));
+            style.alignment = TextAnchor.MiddleRight;
             GUI.Label(rect, full, style);
-            Text.Anchor = TextAnchor.UpperLeft;
             // 划线段定位（右对齐：从右往左）
             float right = rect.xMax;
             float kSuffixW = style.CalcSize(new GUIContent(" 密钥")).x;

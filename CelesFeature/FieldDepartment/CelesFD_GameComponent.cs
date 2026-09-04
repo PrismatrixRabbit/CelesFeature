@@ -100,6 +100,9 @@ namespace CelesFeature
             base.ExposeData();
             Scribe_Values.Look(ref Fame, "CFD_Fame", 0);
             Scribe_Values.Look(ref Credit, "CFD_Credit", 0);
+            // W-3 N3：每象武备额度
+            Scribe_Values.Look(ref quotaUsedThisQuadrum, "CFD_quotaUsedThisQuadrum", 0);
+            Scribe_Values.Look(ref weaponRefreshCount, "CFD_weaponRefreshCount", 0);
             Scribe_Values.Look(ref QuantumKey, "CFD_QuantumKey", 0);
             Scribe_Values.Look(ref UnlockLevelValue, "CFD_UnlockLevelValue", 0);
             Scribe_Values.Look(ref TradeVolume, "CFD_TradeVolume", 0);
@@ -291,15 +294,22 @@ namespace CelesFeature
                     && Find.TickManager.TicksGame - ApologyTriggerTick >= ApologyExpireTicks ? 1f : 0f);
         }
 
-        // ═══ M7-3：在途物流到期交付（自建 tick 计时——天然 dev 快进兼容；倒序遍历防索引错位） ═══
+        // ═══ M7-3 + W-4：在途物流三阶段交付（运输→即将抵达倒计时→落地） ═══
+        // W-4 新增：到期后不再直接降落——先 5 秒倒计时（Alert"货物购买 即将抵达：xx秒"），结束后才 DeliverLogistics
         private void TryCheckLogisticsArrivals()
         {
             long now = Find.TickManager.TicksGame;
             for (int i = InTransitList.Count - 1; i >= 0; i--)
             {
                 CelesFD_LogisticsOrder lo = InTransitList[i];
-                if (now < lo.arrivalTick) continue;
-                if (DeliverLogistics(lo))   // 交付失败（无地图等）→ 保留下轮重试
+                if (now < lo.arrivalTick) continue;   // 阶段 1：运输中
+                if (lo.countdownStartTick < 0)
+                {
+                    lo.countdownStartTick = now;   // 进入阶段 2：启动倒计时（同 tick 不交付）
+                    continue;
+                }
+                if (now < lo.countdownStartTick + CelesFD_LogisticsOrder.CountdownTicks) continue;   // 阶段 2：倒计时中
+                if (DeliverLogistics(lo))   // 阶段 3：交付（失败→保留下轮重试）
                     InTransitList.RemoveAt(i);
             }
         }
@@ -810,6 +820,141 @@ namespace CelesFeature
             CelesFD_SupportState s = GetSupportState(def, false);
             if (s == null || s.available <= 0) return false;
             s.available--;
+            return true;
+        }
+
+        // ═══ W-3 N1/N3：冷却 + 每象额度（2026-09-04 用户三项新需求）═══
+
+        // 每象已用武备额度（Scribe；自动刷新归零——见 ResetQuadrumCounters）
+        public int quotaUsedThisQuadrum;
+        // 本象武备额度刷新计次（Scribe；自动刷新归零——价格 2n+2 密钥递增）
+        public int weaponRefreshCount;
+        // 刷新冷却（真实时间 5s——同市场刷新 TryManualRefresh :494 模式）
+        [Unsaved]
+        private float lastWeaponRefreshRealTime = -1f;
+
+        // 冷却中查询
+        public bool IsCooldownActive(CelesFD_SupportDef def)
+        {
+            CelesFD_SupportState s = GetSupportState(def, false);
+            return s != null && s.cooldownUntilTick > Find.TickManager.TicksGame;
+        }
+
+        // 冷却剩余（tick；非冷却返回 0）
+        public long CooldownTicksRemaining(CelesFD_SupportDef def)
+        {
+            CelesFD_SupportState s = GetSupportState(def, false);
+            if (s == null || s.cooldownUntilTick < 0) return 0;
+            return Math.Max(0, s.cooldownUntilTick - Find.TickManager.TicksGame);
+        }
+
+        // 当前等级的每象武备上限（查 UnlockLevelDef）
+        public int QuotaCap
+        {
+            get
+            {
+                int level = GetEffectiveLevel();
+                // 按等级查 UnlockLevelDef 的 weaponQuotaPerQuadrum
+                CelesFD_UnlockLevelConfigDef config = DefDatabase<CelesFD_UnlockLevelConfigDef>.AllDefsListForReading.FirstOrDefault();
+                if (config == null || config.unlockLevel.NullOrEmpty()) return 4;   // 兜底
+                string defName = level < config.unlockLevel.Count ? config.unlockLevel[level] : config.unlockLevel[config.unlockLevel.Count - 1];
+                CelesFD_UnlockLevelDef levelDef = DefDatabase<CelesFD_UnlockLevelDef>.GetNamedSilentFail(defName);
+                return levelDef?.weaponQuotaPerQuadrum ?? 4;
+            }
+        }
+
+        // 额度剩余
+        public int QuotaRemaining => Math.Max(0, QuotaCap - quotaUsedThisQuadrum);
+
+        // 额度可用（不占额度的支援恒可用）
+        public bool IsQuotaAvailable(CelesFD_SupportDef def)
+        {
+            return !def.occupiesQuota || QuotaRemaining > 0;
+        }
+
+        // R1 拆两层（交叉评审 2026-09-04）：编排方法——冷却→额度→扣次→副作用（冷却启动+额度计数）
+        // Projectile_SupportCaller.Impact 改调此方法；纯扣次 TryConsumeSupport 保留不改（dev 工具/未来路径）
+        public bool TryUseSupport(CelesFD_SupportDef def)
+        {
+            if (IsCooldownActive(def)) return false;
+            if (!IsQuotaAvailable(def)) return false;
+            if (!TryConsumeSupport(def)) return false;
+            // 副作用：启动冷却 + 占用额度
+            CelesFD_SupportState s = GetSupportState(def, false);
+            if (def.cooldownTicks > 0 && s != null)
+                s.cooldownUntilTick = Find.TickManager.TicksGame + def.cooldownTicks;
+            if (def.occupiesQuota)
+                quotaUsedThisQuadrum++;
+            return true;
+        }
+
+        // R2 收口（交叉评审）：象限计数器重置——仅在市场自动刷新路径调用（每象第三日）
+        // 手动市场刷新（isManual=true）不触发（R3 用户裁决 2026-09-04：否——手动刷市场不白送武备额度）
+        public void ResetQuadrumCounters()
+        {
+            quotaUsedThisQuadrum = 0;
+            weaponRefreshCount = 0;
+        }
+
+        // 武备额度刷新（N3）：价格 2n+2 密钥（2/4/6/8...递增）+ 5s 真实时间冷却 + 重置 quotaUsed
+        // 模式参照 TryManualRefresh（:492-520——5s 冷却/计价/余额拒绝/message 反馈同构）
+        public bool TryManualWeaponRefresh()
+        {
+            if (Time.realtimeSinceStartup - lastWeaponRefreshRealTime < 5f) return false;
+            int cost = 2 * weaponRefreshCount + 2;   // n=0→2, 1→4, 2→6...（用户裁决：仅密钥段，无信用额段）
+            if (QuantumKey < cost)
+            {
+                Messages.Message("CelesFD_Keyed_ArmoryNoKeyRefresh".Translate(cost), MessageTypeDefOf.RejectInput);
+                return false;
+            }
+            ModifyQuantumKey(-cost);
+            weaponRefreshCount++;
+            lastWeaponRefreshRealTime = Time.realtimeSinceStartup;
+            quotaUsedThisQuadrum = 0;
+            Log.Message("[CelesFD] Weapon quota refreshed: used=0/" + QuotaCap + " cost=" + cost + " keys");
+            return true;
+        }
+
+        // W-3 武备页批量提交：逐项校验（等级/上限/余额）→ 计总价 → 扣款 → 逐项 pending += draft
+        // 模式参照 TryPlaceShoppingOrder（:620-650——先校验后扣款、余额不足零扣款回退）
+        public bool TrySubmitSupportOrder(Dictionary<string, int> drafts)
+        {
+            if (drafts == null || drafts.Count == 0) return false;
+            // 1. 校验 + 计价
+            int totalCredit = 0, totalKey = 0;
+            var validItems = new List<KeyValuePair<CelesFD_SupportDef, int>>();
+            foreach (var kv in drafts)
+            {
+                if (kv.Value <= 0) continue;
+                CelesFD_SupportDef def = DefDatabase<CelesFD_SupportDef>.GetNamedSilentFail(kv.Key);
+                if (def == null) continue;
+                // 等级校验
+                if (def.unlockLevel > GetEffectiveLevel()) return false;
+                // 上限校验
+                CelesFD_SupportState s = GetSupportState(def, false);
+                int avail = s?.available ?? 0, pend = s?.pending ?? 0;
+                if (avail + pend + kv.Value > def.maxTotal) return false;
+                validItems.Add(new KeyValuePair<CelesFD_SupportDef, int>(def, kv.Value));
+                totalCredit += def.creditCost * kv.Value;
+                totalKey += def.keyCost * kv.Value;
+            }
+            if (validItems.Count == 0) return false;
+            // 2. 余额校验（零扣款回退）
+            if (Credit < totalCredit || QuantumKey < totalKey)
+            {
+                Messages.Message("CelesFD_Keyed_ArmoryInsufficientFunds".Translate(), MessageTypeDefOf.RejectInput);
+                return false;
+            }
+            // 3. 扣款
+            ModifyCredit(-totalCredit);
+            ModifyQuantumKey(-totalKey);
+            // 4. 入账 pending
+            foreach (var item in validItems)
+            {
+                CelesFD_SupportState s = GetSupportState(item.Key, true);
+                s.pending += item.Value;
+                s.pendingSinceTick = Find.TickManager.TicksGame;
+            }
             return true;
         }
 

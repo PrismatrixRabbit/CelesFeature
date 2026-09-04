@@ -94,6 +94,13 @@ namespace CelesFeature
                 {
                     phase = BeaconPhase.Active;
                     TryTriggerEffect();
+                    // W-4（2026-09-04 生命周期解耦）：无正在进行计时 → 触发即销毁
+                    //（效果实体[TrackingBeam/Skyfaller/Controller]独立存活，不依赖信标监护）
+                    if (!SupportDef.hasOngoingTimer)
+                    {
+                        Destroy();
+                        return;
+                    }
                 }
             }
             else

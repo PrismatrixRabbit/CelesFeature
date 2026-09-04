@@ -29,6 +29,13 @@ namespace CelesFeature
         // canTargetPawns 已删除（2026-09-03 裁决：目标唯一 = 信标落点，永久）
         public Color beamColor = new Color(1f, 0.078f, 0.078f, 0.95f);   // 信标光柱颜色（XML (r,g,b,a) 0-255——ParseHelper.cs:242-282 GenColor.FromBytes 实证；默认攻击红 255,20,20,242）
         public float beamWidth = 0.5f;    // 信标光柱宽度（格）
+        // ── W-3（2026-09-04 用户三项新需求）──
+        public int cooldownTicks = 0;          // 冷却时长（tick；0=无冷却；XML 可调占位）
+        public bool occupiesQuota = true;      // 是否占用每象武备额度（description 显示）
+        public string uiIcon;                  // FloatMenu/卡片 icon 路径（Celes/UI/CelesFD_Icons/xxx；不含扩展名）
+        // ── W-4（2026-09-04 用户需求：生命周期解耦）──
+        public bool hasOngoingTimer = false;   // 是否有正在进行计时（true=信标监视控制器完整执行[仅弹幕类]；
+                                               // false=触发即销毁[激光/狙击/投送等——效果实体独立存活]）
 
         public override IEnumerable<string> ConfigErrors()
         {
@@ -47,6 +54,7 @@ namespace CelesFeature
         public int available;
         public int pending;
         public long pendingSinceTick = -1;   // 最近一批申请提交时刻（-1 = 无审批中）
+        public long cooldownUntilTick = -1;  // 冷却截止时刻（-1 = 不在冷却；W-3 N1）
 
         public void ExposeData()
         {
@@ -54,6 +62,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref available, "available", 0);
             Scribe_Values.Look(ref pending, "pending", 0);
             Scribe_Values.Look(ref pendingSinceTick, "pendingSinceTick", -1L);
+            Scribe_Values.Look(ref cooldownUntilTick, "cooldownUntilTick", -1L);
         }
     }
 }

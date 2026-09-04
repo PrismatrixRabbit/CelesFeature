@@ -226,14 +226,22 @@ namespace CelesFeature
         }
 
         // 超宽 ... 截断（不换行——用户规格 2026-08-15）
+        // G23 修复（归 W-3）：二分截断替代逐字符回退——原 O(n) 次 CalcSize/帧/卡（长品名数百字符），
+        //   二分 O(log n) 次；结果语义不变（最长可放下的前缀 + "..."）
         private static string TruncateText(string text, float maxWidth, float size)
         {
             GUIStyle style = CelesFD_UIConfig.GetScaledStyle(size);
             if (text == null || style.CalcSize(new GUIContent(text)).x <= maxWidth) return text;
-            string cut = text;
-            while (cut.Length > 1 && style.CalcSize(new GUIContent(cut + "...")).x > maxWidth)
-                cut = cut.Substring(0, cut.Length - 1);
-            return cut + "...";
+            int lo = 1, hi = text.Length;   // [lo, hi] = 可能的前缀长度域
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                if (style.CalcSize(new GUIContent(text.Substring(0, mid) + "...")).x <= maxWidth)
+                    lo = mid;
+                else
+                    hi = mid - 1;
+            }
+            return text.Substring(0, lo) + "...";
         }
 
         // ═══ 通用往复滚动文本（品名/进度/长数值共用；超宽时 PingPong 左右滚动，未超宽静态显示） ═══
@@ -257,7 +265,18 @@ namespace CelesFeature
         private static void DrawScaledLabel(Rect rect, string text, float size)
         {
             Text.Font = GameFont.Small;
-            GUI.Label(rect, text, CelesFD_UIConfig.GetScaledStyle(size));
+            GUIStyle style = CelesFD_UIConfig.GetScaledStyle(size);
+            // G22 缓存 alignment 冻结——非默认 Text.Anchor 需克隆（同 Page_Trade 修复）
+            if (Text.Anchor != TextAnchor.UpperLeft)
+            {
+                var clone = new GUIStyle(style);
+                clone.alignment = Text.Anchor;
+                GUI.Label(rect, text, clone);
+            }
+            else
+            {
+                GUI.Label(rect, text, style);
+            }
         }
     }
 }

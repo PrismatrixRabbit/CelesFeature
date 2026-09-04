@@ -29,6 +29,8 @@ namespace CelesFeature
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             if (gc == null) return;
             gc.ShoppingCart.Clear();   // M7-2（用户裁决 2026-08-15）：刷新直接清空购物车且不补充（省去匹配代码）
+            // R2/R3（W-3 交叉评审）：仅自动刷新重置每象武备额度（手动刷新不触发——用户裁决 2026-09-04）
+            if (!isManual) gc.ResetQuadrumCounters();
             long now = Find.TickManager.TicksGame;
 
             Phase1Cleanup(gc, now);

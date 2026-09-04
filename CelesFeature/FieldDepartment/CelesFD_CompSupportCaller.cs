@@ -69,26 +69,51 @@ namespace CelesFeature
             yield return cmd;
         }
 
-        // gizmo 点击 → FloatMenu（§2.1：可用增援 floatmenu；显示 `武备xxx 1(2)次`；审批中 = 灰显不可选 + tooltip 提示审批中）
+        // gizmo 点击 → FloatMenu（§2.1；W-3 升级：icon + X(Y) 格式 + 三条件灰显）
         private void OpenSupportMenu()
         {
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             var options = new List<FloatMenuOption>();
             foreach (CelesFD_SupportDef def in DefDatabase<CelesFD_SupportDef>.AllDefsListForReading)
             {
-                if (def.supportType != CelesFD_SupportType.CombatEquipment) continue;   // W-1 仅武备（人员随 R 系列）
+                if (def.supportType != CelesFD_SupportType.CombatEquipment) continue;
                 if (gc == null) continue;
                 int avail = gc.AvailableCount(def);
                 int pend = gc.PendingCount(def);
-                if (avail <= 0 && pend <= 0) continue;   // 无可用也无审批中 → 不列出
+                if (avail <= 0 && pend <= 0) continue;
                 CelesFD_SupportDef localDef = def;
+
+                // W-3 N2：带 icon 构造（FloatMenuOption.cs:262——Texture2D + Color + HorizontalJustification.Left）
+                Texture2D icon = null;
+                if (!localDef.uiIcon.NullOrEmpty())
+                    icon = ContentFinder<Texture2D>.Get(localDef.uiIcon, false);
+
                 FloatMenuOption option = new FloatMenuOption(
-                    string.Format("{0} {1}({2})次", def.LabelCap, avail, pend),
-                    () => StartTargeting(localDef));
+                    string.Format("{0} {1}({2})", localDef.LabelCap, avail, pend),   // 名称 X(Y)——Y 不含 draft
+                    () => StartTargeting(localDef),
+                    icon, Color.white,
+                    MenuOptionPriority.Default, null, null, 0f, null, null, true, 0,
+                    HorizontalJustification.Left);
+
+                // W-3 三条件灰显（优先级：审批中 > 冷却 > 额度）
                 if (avail <= 0)
                 {
-                    option.Disabled = true;   // 仅审批中：显示最终数量但不可选（FloatMenuOption.cs:182-195）
+                    option.Disabled = true;
                     option.tooltip = "CelesFD_Keyed_SupportPending".Translate();
+                }
+                else if (gc.IsCooldownActive(localDef))
+                {
+                    option.Disabled = true;
+                    long remainTicks = gc.CooldownTicksRemaining(localDef);
+                    int remainSec = (int)(remainTicks / 60);
+                    option.tooltip = "CelesFD_Keyed_ArmoryCooldownActive".Translate(
+                        localDef.LabelCap,
+                        string.Format("{0:00}:{1:00}秒", remainSec / 60, remainSec % 60));
+                }
+                else if (localDef.occupiesQuota && !gc.IsQuotaAvailable(localDef))
+                {
+                    option.Disabled = true;
+                    option.tooltip = "CelesFD_Keyed_ArmoryQuotaExhausted".Translate();
                 }
                 options.Add(option);
             }
@@ -97,7 +122,6 @@ namespace CelesFeature
                 Messages.Message("CelesFD_Keyed_NoSupportAvailable".Translate(), MessageTypeDefOf.RejectInput);
                 return;
             }
-            // W-1 先原版 FloatMenu（左上角锚定 + 分列/边界全自动）；左下角方案（FloatMenuGrid）批内最小验证后定（§5.1-1）
             Find.WindowStack.Add(new FloatMenu(options));
         }
 

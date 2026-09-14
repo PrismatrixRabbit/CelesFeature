@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using RimWorld;
-using UnityEngine;
 using Verse;
 
 namespace CelesFeature
@@ -66,115 +65,57 @@ namespace CelesFeature
         }
     }
 
-    // c 类·渐进弹幕（用户清单 3）：originCell→信标方向，信标=第一排中列，向远离投掷者推进；
-    //   排内左→右（同排间隔），排间推进（排间间隔），格距 grid pitch（用户裁决 5）
-    public class CelesFD_Effect_ProgressiveBarrage : CelesFD_SupportEffect
+    // W-5：排程投放（合并旧 ProgressiveBarrage/SmokeLine/MixedBarrage——空间解析统一移入 LandingRule）
+    // Grid 规则（IGridLayout）：行主序索引 → 排间 forwardInterval / 同排 lateralInterval
+    //   （与旧公式 r*rowInterval + c*sameRow 逐 tick 等价）；取 fallerDefs 首项
+    // Scatter 规则：均匀 scatterInterval；每点随机选弹
+    public class CelesFD_Effect_Barrage : CelesFD_SupportEffect
     {
-        public int rows = 5;
-        public int columns = 3;
-        public int sameRowIntervalTicks = 180;   // 0.3s
-        public int rowIntervalTicks = 900;       // 1.5s
-        public int cellSpacing = 5;              // 用户裁决
-        public ThingDef fallerDef;
+        public List<ThingDef> fallerDefs;        // Grid 取首项 / Scatter 每点随机选
+        public int forwardIntervalTicks = 90;    // 前向排间延迟（1.5s——渐进弹幕线上值）
+        public int lateralIntervalTicks = 18;    // 同排侧向延迟（0.3s）
+        public int scatterIntervalTicks = 18;    // 散布均匀间隔（原版 Bombardment.bombIntervalTicks 同值 A2-2）
 
         public override void Trigger(CelesFD_EffectContext ctx)
         {
-            if (fallerDef == null || ctx.Map == null) return;
-            // 方向向量：投掷者→信标（零向量兜底向北）
-            Vector3 dir = (ctx.Cell - ctx.OriginCell).ToVector3();
-            dir.y = 0f;
-            if (dir.sqrMagnitude < 0.01f) dir = new Vector3(0f, 0f, -1f);
-            dir.Normalize();
-            Vector3 perp = new Vector3(-dir.z, 0f, dir.x);
-            var entries = new List<CelesFD_BarrageController.ScheduleEntry>();
-            for (int r = 0; r < rows; r++)
+            if (fallerDefs.NullOrEmpty() || ctx.Map == null)
             {
-                for (int c = 0; c < columns; c++)
+                Log.Warning("[CelesFD] Effect_Barrage missing fallerDefs (support " +
+                    (ctx.SupportDef != null ? ctx.SupportDef.defName : "null") + ")");
+                return;
+            }
+            var entries = new List<CelesFD_BarrageController.ScheduleEntry>();
+            if (ctx.SupportDef != null && ctx.SupportDef.landingRule is CelesFD_IGridLayout grid)
+            {
+                // Grid 路径：r = i / LateralCount、c = i % LateralCount（行主序契约——见 LandingRule）
+                for (int i = 0; i < ctx.Cells.Count; i++)
                 {
-                    IntVec3 cell = (ctx.Cell.ToVector3()
-                        + dir * (r * cellSpacing)
-                        + perp * ((c - (columns - 1) * 0.5f) * cellSpacing)).ToIntVec3();
-                    if (!cell.InBounds(ctx.Map)) continue;
-                    var e = new CelesFD_BarrageController.ScheduleEntry
+                    entries.Add(new CelesFD_BarrageController.ScheduleEntry
                     {
-                        offsetTicks = r * rowIntervalTicks + c * sameRowIntervalTicks,
-                        cell = cell,
-                        fallerDef = fallerDef
-                    };
-                    entries.Add(e);
+                        offsetTicks = (i / grid.LateralCount) * forwardIntervalTicks
+                                    + (i % grid.LateralCount) * lateralIntervalTicks,
+                        cell = ctx.Cells[i],
+                        fallerDef = fallerDefs[0]
+                    });
                 }
             }
-            SpawnAndRegister(ctx, entries);
-        }
-
-        internal static void SpawnAndRegister(CelesFD_EffectContext ctx, List<CelesFD_BarrageController.ScheduleEntry> entries)
-        {
+            else
+            {
+                for (int i = 0; i < ctx.Cells.Count; i++)
+                {
+                    entries.Add(new CelesFD_BarrageController.ScheduleEntry
+                    {
+                        offsetTicks = i * scatterIntervalTicks,
+                        cell = ctx.Cells[i],
+                        fallerDef = fallerDefs.RandomElement()
+                    });
+                }
+            }
+            // 锚点 = 信标格（Grid(1,5) 的 Cells[0] 是垂线端点而非信标；排程器为隐形 Ethereal，锚点无功能）
             if (entries.Count == 0) return;
-            CelesFD_BarrageController controller = CelesFD_BarrageController.SpawnController(ctx.Map, ctx.Cell, entries);
+            CelesFD_BarrageController controller = CelesFD_BarrageController.SpawnController(
+                ctx.Map, ctx.Beacon.Position, entries);
             ctx.RegisterController(controller);
-        }
-    }
-
-    // c 类·一字烟幕（用户清单 3'）：投掷线垂线方向、信标为中点、逐点错峰坠落烟幕舱（单点 r7.9 一次性 BlindSmoke）
-    public class CelesFD_Effect_SmokeLine : CelesFD_SupportEffect
-    {
-        public int dropCount = 5;
-        public int intervalTicks = 300;   // 0.5s
-        public int spacing = 5;           // 用户裁决
-        public ThingDef fallerDef;
-
-        public override void Trigger(CelesFD_EffectContext ctx)
-        {
-            if (fallerDef == null || ctx.Map == null) return;
-            Vector3 dir = (ctx.Cell - ctx.OriginCell).ToVector3();
-            dir.y = 0f;
-            if (dir.sqrMagnitude < 0.01f) dir = new Vector3(0f, 0f, -1f);
-            dir.Normalize();
-            Vector3 perp = new Vector3(-dir.z, 0f, dir.x);
-            var entries = new List<CelesFD_BarrageController.ScheduleEntry>();
-            for (int i = 0; i < dropCount; i++)
-            {
-                IntVec3 cell = (ctx.Cell.ToVector3() + perp * ((i - (dropCount - 1) * 0.5f) * spacing)).ToIntVec3();
-                if (!cell.InBounds(ctx.Map)) continue;
-                entries.Add(new CelesFD_BarrageController.ScheduleEntry
-                {
-                    offsetTicks = i * intervalTicks,
-                    cell = cell,
-                    fallerDef = fallerDef
-                });
-            }
-            CelesFD_Effect_ProgressiveBarrage.SpawnAndRegister(ctx, entries);
-        }
-    }
-
-    // c 类·混杂弹幕（用户清单 4）：半径内随机点、随机二类弹（爆/燃）、齐射节奏（原版轨道轰炸间隔 18 tick）
-    public class CelesFD_Effect_MixedBarrage : CelesFD_SupportEffect
-    {
-        public float radius = 16.9f;      // 用户确认（x.9 约定）
-        public int count = 15;
-        public int intervalTicks = 18;    // Bombardment.bombIntervalTicks 默认（A2-2）
-        public List<ThingDef> fallerDefs;
-        // 范围预览圈移至选点期（SupportDef.previewRadius——三轮裁决：执行期不画）
-
-        public override void Trigger(CelesFD_EffectContext ctx)
-        {
-            if (fallerDefs.NullOrEmpty() || ctx.Map == null) return;
-            // 候选格缓存（半径内可通行——一次构建，均匀抽取）
-            var cells = new List<IntVec3>();
-            foreach (IntVec3 c in GenRadial.RadialCellsAround(ctx.Cell, radius, useCenter: true))
-                if (c.InBounds(ctx.Map) && c.Walkable(ctx.Map)) cells.Add(c);
-            var entries = new List<CelesFD_BarrageController.ScheduleEntry>();
-            for (int i = 0; i < count; i++)
-            {
-                IntVec3 cell = cells.Count > 0 ? cells.RandomElement() : ctx.Cell;
-                entries.Add(new CelesFD_BarrageController.ScheduleEntry
-                {
-                    offsetTicks = i * intervalTicks,
-                    cell = cell,
-                    fallerDef = fallerDefs.RandomElement()
-                });
-            }
-            CelesFD_Effect_ProgressiveBarrage.SpawnAndRegister(ctx, entries);
         }
     }
 }

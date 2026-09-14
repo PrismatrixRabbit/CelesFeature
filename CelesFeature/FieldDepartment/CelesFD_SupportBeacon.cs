@@ -114,18 +114,21 @@ namespace CelesFeature
             }
         }
 
-        // 到期触发：解析落点 → 分发效果（效果内 RegisterController；无控制器 = 瞬发 → 下 tick 完成）
+        // 到期触发：解析落点集 → 分发效果（效果内 RegisterController；无控制器 = 瞬发 → 下 tick 完成）
+        // W-5：单格 → 格集（landingRule.TryResolveCells）；null 规则 = 默认就近 [Position]（旧语义）
         private void TryTriggerEffect()
         {
             activeStartTick = Find.TickManager.TicksGame;   // 正在进行的正计时起点（Alert）
-            IntVec3 cell = Position;
-            if (SupportDef.landingRule != null && !SupportDef.landingRule.TryResolveCell(Position, Map, out cell))
+            List<IntVec3> cells = null;
+            if (SupportDef.landingRule != null &&
+                !SupportDef.landingRule.TryResolveCells(Position, originCell, Map, out cells))
             {
-                Log.Warning("[CelesFD] Landing rule failed to resolve cell (support " + SupportDef.defName + ") — finishing");
+                Log.Warning("[CelesFD] Landing rule failed to resolve cells (support " + SupportDef.defName + ") — finishing");
                 return;
             }
+            if (cells.NullOrEmpty()) cells = new List<IntVec3> { Position };
             if (SupportDef.effect != null)
-                SupportDef.effect.Trigger(new CelesFD_EffectContext(this, cell));
+                SupportDef.effect.Trigger(new CelesFD_EffectContext(this, cells));
             else
                 Log.Warning("[CelesFD] Support def has no effect: " + SupportDef.defName);
         }

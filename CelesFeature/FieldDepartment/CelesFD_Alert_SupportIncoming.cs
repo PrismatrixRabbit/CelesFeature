@@ -34,7 +34,7 @@ namespace CelesFeature
         public override string GetLabel()
         {
             CelesFD_SupportBeacon beacon = Beacon;
-            if (beacon == null || beacon.SupportDef == null) return "星铃支援";
+            if (beacon == null || beacon.SupportDef == null) return "CelesFD_Keyed_SupportFallbackLabel".Translate();
             if (beacon.phase == CelesFD_SupportBeacon.BeaconPhase.Waiting)
             {
                 return "CelesFD_Keyed_SupportIncomingLine".Translate(beacon.SupportDef.LabelCap,
@@ -49,12 +49,13 @@ namespace CelesFeature
             return "CelesFD_Keyed_SupportAlertDesc".Translate();
         }
 
-        // 00:05秒（分:秒；60 tick = 1 秒）——字符串预格式化后入 Translate（防裸数值换行 bug 纪律）
+        // 00:05秒（分:秒；60 tick = 1 秒）——Keyed TimeFormat
         internal static string FormatTicks(int ticks)
         {
             if (ticks < 0) ticks = 0;
             int totalSeconds = ticks / 60;
-            return (totalSeconds / 60).ToString("00") + ":" + (totalSeconds % 60).ToString("00") + "秒";
+            return "CelesFD_Keyed_TimeFormat".Translate(
+                (totalSeconds / 60).ToString("00"), (totalSeconds % 60).ToString("00"));
         }
     }
 

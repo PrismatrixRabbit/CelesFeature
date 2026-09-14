@@ -108,7 +108,8 @@ namespace CelesFeature
                     int remainSec = (int)(remainTicks / 60);
                     option.tooltip = "CelesFD_Keyed_ArmoryCooldownActive".Translate(
                         localDef.LabelCap,
-                        string.Format("{0:00}:{1:00}秒", remainSec / 60, remainSec % 60));
+                        "CelesFD_Keyed_TimeFormat".Translate(
+                            (remainSec / 60).ToString("00"), (remainSec % 60).ToString("00")));
                 }
                 else if (localDef.occupiesQuota && !gc.IsQuotaAvailable(localDef))
                 {

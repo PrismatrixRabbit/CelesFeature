@@ -36,6 +36,7 @@ namespace CelesFeature
         private bool agreeToTerms = true;               // 用户协议（默认勾选；不勾禁用下单）
         private bool subscribeArrival = true;           // 到货提醒（M7：控制抵达 letter）
         private bool expediteOrder;                     // 加急（按钮切换 + 运费×2）
+        private bool infoActive;                        // ？帮助（R-1 UI 改造：子页显示交易页机制介绍）
         private bool fastStartup = true;                // 风味勾选项（纯 UI 状态，无功能）
         private bool allowAds = true;
 
@@ -52,6 +53,7 @@ namespace CelesFeature
             pendingAcceptOrder = null;
             pendingAbandonOrder = null;
             pendingRefresh = false;
+            infoActive = false;   // R-1 风格批：切页重置 ？态（默认文本恢复）
         }
 
         // ═══ 主页面 ═══
@@ -187,7 +189,7 @@ namespace CelesFeature
                 abandonBtnRect: ref abandonConfirmRect,
                 onAbandon: OnAbandonClicked);
             // 卡片点击选中（同 DrawOrderCard——已接取订单也可查看 description）
-            if (Widgets.ButtonInvisible(rect)) selectedOrder = o;
+            if (Widgets.ButtonInvisible(rect)) { selectedOrder = o; infoActive = false; }
         }
 
         private void OnAbandonClicked(CelesFD_Order o)
@@ -245,7 +247,7 @@ namespace CelesFeature
                 onBuy: TryAddToCart,
                 onToggleLock: OnToggleLockClicked);
             // 卡片点击选中（M5b 接线遗漏修复 2026-08-15）：ButtonInvisible 在按钮绘制之后——IMGUI 先绘先消费，不吞按钮点击
-            if (Widgets.ButtonInvisible(rect)) selectedOrder = o;
+            if (Widgets.ButtonInvisible(rect)) { selectedOrder = o; infoActive = false; }
         }
 
         private void OnAcceptClicked(CelesFD_Order o)
@@ -324,6 +326,7 @@ namespace CelesFeature
                     if (!gc.TryManualRefresh())
                         Messages.Message("CelesFD_Keyed_RefreshRejected".Translate(), MessageTypeDefOf.RejectInput);
                     pendingRefresh = false;
+            infoActive = false;   // R-1 风格批：切页重置 ？态（默认文本恢复）
                 }
             }
             else if (Widgets.ButtonText(btnRect, "CelesFD_Keyed_RefreshMarket".Translate().ToString() + (cooldown ? " (" + "CelesFD_Keyed_RefreshCooldown".Translate().ToString() + ")" : ""), drawBackground: true))   // 背景恒绘（同确认态——灰染表禁用，实证 Widgets.cs:1471-1474）
@@ -356,7 +359,8 @@ namespace CelesFeature
 
             Widgets.DrawMenuSection(rect);
             Rect inner = rect.ContractedBy(4f);
-            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 24f), "CelesFD_Keyed_Cart".Translate());
+            Widgets.Label(new Rect(inner.x, inner.y, inner.width - 34f, 24f), "CelesFD_Keyed_Cart".Translate());
+            if (CelesFD_UIConfig.DrawHelpButton(inner.xMax - 24f, inner.y, 24f)) infoActive = !infoActive;
 
             // 总重量（§6.4：运费 W 输入 + 超重警示）
             // 修复（2026-08-15）：原 Widgets.Label 默认 Small + 固定 20f/18f rect——Small 行高实测 ≈20，18f 必然溢出
@@ -486,10 +490,12 @@ namespace CelesFeature
             // 底部固定按钮（标准 ⇄ 加急；未同意协议 → 原版禁用模式：GUI.color 灰染 + 可点提示）
             // 反编译实证（Widgets.cs:1467-1521）：active=false 只禁点击视觉不变；原版禁用视觉 = GUI.color 灰染 + ButtonText
             string btnLabel = expediteOrder ? "CelesFD_Keyed_PlaceExpedite".Translate() : "CelesFD_Keyed_PlaceOrder".Translate();
-            GUI.color = agreeToTerms ? Color.white : new Color(0.5f, 0.5f, 0.5f, 0.9f);
+            GUI.color = agreeToTerms && cart.Count > 0 ? Color.white : new Color(0.5f, 0.5f, 0.5f, 0.9f);   // 细节批：补空购物车灰显（武备页同模式——两条件联查）
             if (Widgets.ButtonText(btnRect, btnLabel, drawBackground: true))
             {
-                if (agreeToTerms)
+                if (cart.Count == 0)
+                    Messages.Message("CelesFD_Keyed_TradeCheckoutEmpty".Translate(), MessageTypeDefOf.RejectInput, false);   // 空购物车提示（同武备模式——细节批）
+                else if (agreeToTerms)
                     gc.TryPlaceShoppingOrder(expediteOrder, subscribeArrival);   // M7-2：分币种扣款 + 物流单
                 else
                     Messages.Message("CelesFD_Keyed_NeedAgreeTerms".Translate(), MessageTypeDefOf.RejectInput);
@@ -605,7 +611,7 @@ namespace CelesFeature
             string kText = BuildFloorText(key);
             string full = cText + " 信用额 + " + kText + " 密钥";
             // G22 缓存 alignment 冻结——克隆 + 显式右对齐（交易页对齐修复）
-            GUIStyle style = new GUIStyle(CelesFD_UIConfig.GetScaledStyle(size));
+            GUIStyle style = CelesFD_UIConfig.CloneScaledStyle(size);
             style.alignment = TextAnchor.MiddleRight;
             GUI.Label(rect, full, style);
             // 划线段定位（右对齐：从右往左）
@@ -651,10 +657,16 @@ namespace CelesFeature
             gc.ShoppingCart.Add(o);
         }
 
-        // ═══ 上方子页（选中订单 description；未选中 = 空） ═══
+        // ═══ 上方子页（？帮助介绍优先 > 选中订单 description；未选中 = 空） ═══
         public void DrawSubPage(Rect rect)
         {
             Widgets.DrawMenuSection(rect);
+            // ？帮助（R-1 UI 改造）：交易页机制介绍
+            if (infoActive)
+            {
+                CelesFD_UIConfig.DrawInfoText(rect.ContractedBy(10f), "CelesFD_Keyed_InfoTrade".Translate());
+                return;
+            }
             if (selectedOrder == null) return;
             // 刷新后订单对象可能失效 → 检测并清除
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;

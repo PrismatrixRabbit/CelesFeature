@@ -122,7 +122,14 @@
         <Compile Include="FieldDepartment\CelesFD_SupportEffect.cs" />
         <Compile Include="FieldDepartment\CelesFD_LandingRule.cs" />
         <Compile Include="FieldDepartment\CelesFD_Alert_SupportIncoming.cs" />
-        <Compile Include="FieldDepartment\CelesFD_Effect_CrateStrike.cs" />
+        <Compile Include="FieldDepartment\CelesFD_Effect_Drop.cs" />
+        <Compile Include="FieldDepartment\CelesFD_PersonnelOrder.cs" />
+        <Compile Include="FieldDepartment\CelesFD_Alert_Personnel.cs" />
+        <Compile Include="FieldDepartment\CelesFD_PawnTeleport.cs" />
+        <Compile Include="FieldDepartment\CelesFD_PendingSettlement.cs" />
+        <Compile Include="FieldDepartment\CelesFD_QuestPart_SupportLeave.cs" />
+        <Compile Include="FieldDepartment\CelesFD_Settlement.cs" />
+        <Compile Include="FieldDepartment\CelesFD_PawnWorldEvents.cs" />
         <Compile Include="FieldDepartment\CelesFD_BarrageController.cs" />
         <Compile Include="FieldDepartment\CelesFD_Thing_TrackingBeam.cs" />
         <Compile Include="FieldDepartment\CelesFD_Verb_SupportCall.cs" />

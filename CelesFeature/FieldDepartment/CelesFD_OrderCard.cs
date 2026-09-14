@@ -193,8 +193,8 @@ namespace CelesFeature
             ThingDef td = e.thingDefName.NullOrEmpty() ? null : DefDatabase<ThingDef>.GetNamedSilentFail(e.thingDefName);
             if (td != null)
                 Widgets.ThingIcon(new Rect(left.x + 3f, left.y + 4f, 36f, 36f), td);
-            DrawScaledLabel(new Rect(left.x + 2f, left.yMax - subH, left.width - 4f, subH),
-                TruncateText(e.thingLabel ?? e.label, left.width - 4f, SubSize), SubSize);
+            DrawScaledLabel(new Rect(left.x + 2f, left.yMax - subH, left.width + mid.width - 6f, subH),
+                TruncateText(e.thingLabel ?? e.label, left.width + mid.width - 6f - 4f, SubSize), SubSize);
             // 中区：数量 + 报酬（信用额/密钥）
             float curY = mid.y + 4f;
             DrawScaledLabel(new Rect(mid.x, curY, mid.width, mainH), "CelesFD_Keyed_OrderQty".Translate(e.amount), MainSize);

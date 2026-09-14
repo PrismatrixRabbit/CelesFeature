@@ -6,6 +6,8 @@ using RimWorld;
 using RimWorld.Planet;
 using UnityEngine;
 using Verse;
+using Verse.AI;
+using Verse.AI.Group;
 using Verse.Sound;
 
 namespace CelesFeature
@@ -85,6 +87,12 @@ namespace CelesFeature
         // ═══ W-1：支援系统状态（武备三态：available/pending；draft 为 UI 草稿不存档——§2.3） ═══
         public List<CelesFD_SupportState> SupportStates = new List<CelesFD_SupportState>();
 
+        // ═══ R-1：人员部署单 ═══
+        public List<CelesFD_PersonnelOrder> PersonnelOrders = new List<CelesFD_PersonnelOrder>();
+
+        // ═══ R-2：7 日窗口追踪（PendingSettlement）═══
+        public List<CelesFD_PendingSettlement> PendingSettlements = new List<CelesFD_PendingSettlement>();
+
         // ═══ W-2a：支援信标注册表（[Unsaved]——信标本体随地图存档，注册表由信标 SpawnSetup/Destroy 维护；
         //     Alert_SupportIncoming 数据源；含 null/Destroyed 惰性清理，遍历方自防） ═══
         [Unsaved]
@@ -93,6 +101,7 @@ namespace CelesFeature
         public CelesFD_GameComponent(Game game)
         {
             CelesFD_SupportAlertSlots.ClearAll();   // 跨存档静态槽位清理（每次新游戏/读档均执行）
+            CelesFD_PersonnelAlertSlots.ClearAll(); // R-1 修复3：人员 Alert 槽位同步清理
         }
 
         public override void ExposeData()
@@ -102,6 +111,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref Credit, "CFD_Credit", 0);
             // W-3 N3：每象武备额度
             Scribe_Values.Look(ref quotaUsedThisQuadrum, "CFD_quotaUsedThisQuadrum", 0);
+            Scribe_Values.Look(ref FirstSupportPurchaseDone, "CFD_FirstSupportPurchaseDone", false);
             Scribe_Values.Look(ref weaponRefreshCount, "CFD_weaponRefreshCount", 0);
             Scribe_Values.Look(ref QuantumKey, "CFD_QuantumKey", 0);
             Scribe_Values.Look(ref UnlockLevelValue, "CFD_UnlockLevelValue", 0);
@@ -123,6 +133,8 @@ namespace CelesFeature
             Scribe_Collections.Look(ref OrderArchive, "CFD_OrderArchive", LookMode.Deep);
             Scribe_Collections.Look(ref InTransitList, "CFD_InTransitList", LookMode.Deep);
             Scribe_Collections.Look(ref SupportStates, "CFD_SupportStates", LookMode.Deep);
+            Scribe_Collections.Look(ref PersonnelOrders, "CFD_PersonnelOrders", LookMode.Deep);
+            Scribe_Collections.Look(ref PendingSettlements, "CFD_PendingSettlements", LookMode.Deep);
             Scribe_Values.Look(ref CrystalEventTriggered, "CFD_CrystalEventTriggered", false);
             Scribe_Values.Look(ref CrystalEventTick, "CFD_CrystalEventTick", 0L);
             Scribe_Values.Look(ref ApologyTriggered, "CFD_ApologyTriggered", false);
@@ -194,7 +206,17 @@ namespace CelesFeature
         public override void GameComponentTick()
         {
             base.GameComponentTick();
-            if (Find.TickManager.TicksGame % 250 != 0) return; // 节流：~4 秒一次
+            // 快速路径（每 tick）：秒级倒计时到期→执行——消除 00:00 后最多 200 tick 可见延迟
+            // 仅在有秒级倒计时订单时激活（人员 Incoming / 货运倒计时中——订单数极少，开销可忽略）
+            int now = Find.TickManager.TicksGame;
+            bool fastPath = false;
+            for (int i = 0; i < PersonnelOrders.Count; i++)
+                if (PersonnelOrders[i].phase == CelesFD_PersonnelOrder.Phase.Incoming) { fastPath = true; break; }
+            if (!fastPath)
+                for (int i = 0; i < InTransitList.Count; i++)
+                    if (InTransitList[i].countdownStartTick >= 0) { fastPath = true; break; }
+            if (fastPath) TickFastPaths(now);
+            if (now % 250 != 0) return; // 节流：~4 秒一次（审批/LeavingSoon/Done 等 250tick 延迟可接受）
             TryCheckRelocation();
             TryTickBeaconCooldown();
             TryCheckMarketRefresh();
@@ -203,6 +225,289 @@ namespace CelesFeature
             TryCheckApologyLetter();       // 开局任务链：3700 定时道歉信
             TryCheckFirstAntenna();        // 开局任务链：首建发信器 → 信标站生成
             TickSupportApprovals();        // W-1：武备申请审批到期 → pending 转 available
+            TickPersonnelOrders();         // R-1：人员部署单状态机推进
+            CelesFD_Settlement.TickPendingSettlements(this);   // R-2：7 日窗口轮询
+            TickPendingPawnRescue();   // R-2 !Spawned 修复：被动追踪者恢复 Spawned 后接走
+        }
+
+        // 秒级倒计时快速路径（每 tick——仅覆盖用户可感知的秒级到期：人员落地 + 货运交付）
+        private void TickFastPaths(int now)
+        {
+            // 人员 Incoming 到期 → 落地
+            for (int i = PersonnelOrders.Count - 1; i >= 0; i--)
+            {
+                CelesFD_PersonnelOrder o = PersonnelOrders[i];
+                if (o.phase != CelesFD_PersonnelOrder.Phase.Incoming) continue;
+                CelesFD_SupportDef def = o.Def;
+                if (def != null && now >= o.incomingStartTick + def.arrivalDelayTicks)
+                    ExecutePersonnelArrival(o, def);
+            }
+            // 货运倒计时到期 → 交付（仅倒计时中的单——非倒计时阶段仍走 250 tick 块）
+            for (int i = InTransitList.Count - 1; i >= 0; i--)
+            {
+                CelesFD_LogisticsOrder lo = InTransitList[i];
+                if (lo.countdownStartTick < 0) continue;
+                if (now >= lo.countdownStartTick + CelesFD_LogisticsOrder.CountdownTicks)
+                    if (DeliverLogistics(lo)) InTransitList.RemoveAt(i);
+            }
+        }
+
+        // ═══ R-1 人员支援：下单/轮询/落地（17 §2.2-§2.4 / 18 §3.3-§3.4）═══
+
+        // 单份锁：同一 def 上一份未结束（Phase != Done）不可再申请（P16/C3 裁决）
+        // 修复1：获取部署单当前阶段（null = 无单；卡片层区分"未抵达"/"在场"两种召回按钮表现）
+        public CelesFD_PersonnelOrder.Phase? GetPersonnelPhase(string defName)
+        {
+            for (int i = 0; i < PersonnelOrders.Count; i++)
+                if (PersonnelOrders[i].supportDefName == defName
+                    && PersonnelOrders[i].phase != CelesFD_PersonnelOrder.Phase.Done)
+                    return PersonnelOrders[i].phase;
+            return null;
+        }
+
+        public bool IsPersonnelDeployed(string defName)
+        {
+            for (int i = 0; i < PersonnelOrders.Count; i++)
+                if (PersonnelOrders[i].supportDefName == defName
+                    && PersonnelOrders[i].phase != CelesFD_PersonnelOrder.Phase.Done) return true;
+            return false;
+        }
+
+        // 下单（校验链：等级 → 单份 → 资金；通过即扣费建单——日单价×天数 + 保险预缴）
+        public bool TryOrderPersonnel(CelesFD_SupportDef def, int days, Map map, out string failKey)
+        {
+            failKey = null;
+            if (def == null || def.supportType != CelesFD_SupportType.Personnel) { failKey = "CelesFD_Keyed_PersonnelFailDef"; return false; }
+            if (def.unlockLevel > GetEffectiveLevel()) { failKey = "CelesFD_Keyed_ArmoryLevelLocked"; return false; }
+            if (IsPersonnelDeployed(def.defName)) { failKey = "CelesFD_Keyed_PersonnelAlreadySent"; return false; }
+            if (days < 1 || days > def.maxStayDays) { failKey = "CelesFD_Keyed_PersonnelFailDays"; return false; }
+            if (map == null) { failKey = "CelesFD_Keyed_PersonnelFailDef"; return false; }
+            // 计价（UI 改造终版）：燃油(×人数) + 雇佣(×天数) + 保险 + 额外（creditCost）；密钥额外（keyCost）
+            int headCount = def.personnel.Sum(e => e.amount);
+            int cost = def.fuelFeePerPawn * headCount + def.dailyWage * days + def.insuranceCost + def.creditCost;
+            int keyCost = def.keyCost;
+            if (Credit < cost) { failKey = "CelesFD_Keyed_PersonnelFailCredit"; return false; }
+            if (QuantumKey < keyCost) { failKey = "CelesFD_Keyed_PersonnelFailKey"; return false; }
+            Credit -= cost;
+            if (keyCost > 0) ModifyQuantumKey(-keyCost);
+            long now = Find.TickManager.TicksGame;
+            var order = new CelesFD_PersonnelOrder
+            {
+                supportDefName = def.defName,
+                orderedDays = days,
+                startTick = now,
+                targetMap = map,   // C1：落地目标图下单锁定——不随玩家切图漂移
+                transitEndTick = now + (def.arrivalMode == CelesFD_PersonnelArrivalMode.Standard ? 60000L
+                                       : def.arrivalMode == CelesFD_PersonnelArrivalMode.Expedited ? 2500L : 0L)
+            };
+            PersonnelOrders.Add(order);
+            Log.Message("[CelesFD] Personnel ordered: " + def.defName + " days=" + days + " cost=" + cost
+                + " mode=" + def.arrivalMode + " map=" + map.Tile);
+            return true;
+        }
+
+        // 250 tick 轮询推进（比较式——dev 快进兼容）
+        private void TickPersonnelOrders()
+        {
+            long now = Find.TickManager.TicksGame;
+            for (int i = 0; i < PersonnelOrders.Count; i++)
+            {
+                CelesFD_PersonnelOrder o = PersonnelOrders[i];
+                if (o.phase == CelesFD_PersonnelOrder.Phase.Done) continue;   // 修复3：跳过 Done——R-2 结算后统一清理（当前保留数据）
+                CelesFD_SupportDef def = o.Def;
+                if (def == null) continue;
+                switch (o.phase)
+                {
+                    case CelesFD_PersonnelOrder.Phase.Transit:
+                        if (now >= o.transitEndTick)
+                        {
+                            o.phase = CelesFD_PersonnelOrder.Phase.Incoming; o.incomingStartTick = now;
+                            CelesFD_PersonnelAlertSlots.AssignIncoming(o);   // 修复3：槽位分配（独立 Alert 行）
+                        }
+                        break;
+                    case CelesFD_PersonnelOrder.Phase.Incoming:
+                        if (now >= o.incomingStartTick + def.arrivalDelayTicks) ExecutePersonnelArrival(o, def);
+                        break;
+                    case CelesFD_PersonnelOrder.Phase.Deployed:
+                        if (now >= o.stayUntilTick - CelesFD_PersonnelOrder.LeavingWarnTicks)
+                        {
+                            o.phase = CelesFD_PersonnelOrder.Phase.LeavingSoon;
+                            CelesFD_PersonnelAlertSlots.AssignLeaving(o);   // 修复3：槽位分配
+                        }
+                        break;
+                    case CelesFD_PersonnelOrder.Phase.LeavingSoon:
+                        if (now >= o.stayUntilTick)
+                        {
+                            // R-1 占位：离场由 quest 内 Delay→Leave（原版边缘走出）接管；R-2 替换 G9 序列后由此触发结算
+                            o.phase = CelesFD_PersonnelOrder.Phase.Done;
+                            Log.Message("[CelesFD] Personnel stay expired (leave handled by quest until R-2): " + def.defName);
+                        }
+                        break;
+                }
+                // 全灭释放（防单份锁死锁；结算本体 R-2）
+                if (o.phase == CelesFD_PersonnelOrder.Phase.Deployed || o.phase == CelesFD_PersonnelOrder.Phase.LeavingSoon)
+                {
+                    var alive = new List<Pawn>();
+                    o.AlivePawns(alive);
+                    if (alive.Count == 0)
+                    {
+                        // 全灭 → 立即触发 SupportLeave（方案 B：即时结算 + "已确认全灭"开场句）
+                        if (o.boundQuestId >= 0)
+                        {
+                            foreach (Quest q in Find.QuestManager.QuestsListForReading)
+                                if (q.id == o.boundQuestId && q.State == QuestState.Ongoing)
+                                {
+                                    foreach (QuestPart part in q.PartsListForReading)
+                                        if (part is CelesFD_QuestPart_SupportLeave supportLeave)
+                                        {
+                                            supportLeave.isWiped = true;
+                                            supportLeave.ExecuteLeaveSequence();
+                                            break;
+                                        }
+                                    break;
+                                }
+                        }
+                        Log.Message("[CelesFD] Personnel squad wiped → SupportLeave triggered: " + def.defName);
+                    }
+                }
+            }
+        }
+
+        // R-2 !Spawned 修复：被动追踪者（被背着/容器内）恢复 Spawned 后接走
+        // 遍历 PendingSettlement 的 pendingPawnIds → 发现 Spawned（在地图上）→ 传送或 Lord → 从 pending 移除
+        private void TickPendingPawnRescue()
+        {
+            Faction beacon = CelesFD_BeaconUtility.BeaconFaction;
+            if (beacon == null) return;
+            foreach (CelesFD_PendingSettlement ps in PendingSettlements)
+            {
+                for (int i = ps.pendingPawnIds.Count - 1; i >= 0; i--)
+                {
+                    string id = ps.pendingPawnIds[i];
+                    // 搜索所有地图的 Spawned pawn（被放下后在地图上，非 WorldPawns）
+                    Pawn pawn = null;
+                    foreach (Map map in Find.Maps)
+                    {
+                        pawn = map.mapPawns.AllPawnsSpawned.FirstOrDefault(p => p.thingIDNumber.ToString() == id);
+                        if (pawn != null) break;
+                    }
+                    if (pawn == null || pawn.Dead || pawn.Destroyed) continue;
+                    // 恢复 Spawned → 尝试接走
+                    if (pawn.Faction != beacon) pawn.SetFaction(beacon);
+                    if (CelesFD_PawnTeleport.TryTeleportOut(pawn))
+                    {
+                        // Bug A 修复：Harmony postfix 已同步处理（ExitMap→PassToWorld→postfix→RemoveAt+returnedIds+Differential）
+                        // 此处不做任何后续——postfix 是唯一翻案处理点，双重处理导致 IndexOutOfRange
+                    }
+                    else
+                    {
+                        // 传送失败 → 创建 Lord 走边缘（后续 PassedToWorld 自然翻案）
+                        LordMaker.MakeNewLord(beacon,
+                            new LordJob_ExitMapBest(LocomotionUrgency.Walk, canDig: true, canDefendSelf: true),
+                            pawn.Map, new[] { pawn });
+                        Log.Message("[CelesFD] PendingPawnRescue: Lord created for " + pawn.LabelShort);
+                    }
+                }
+            }
+        }
+
+        // 落地执行（探针 fire B+ 演进——P1-P16 全结论内嵌：slate 预置/B+ 绑定/GetBrain/守卫/同操作入舱）
+        public void ExecutePersonnelArrival(CelesFD_PersonnelOrder order, CelesFD_SupportDef def)
+        {
+            Map map = order.targetMap != null ? order.targetMap : (Find.CurrentMap ?? Find.Maps.FirstOrDefault());   // C1：下单图优先
+            Faction beacon = CelesFD_BeaconUtility.BeaconFaction;
+            QuestScriptDef questDef = CelesFD_DefOf.CelesFD_QuestDef_SupportReinforcement;   // T3：DefOf 引用（加载期校验）
+            if (map == null || beacon == null || questDef == null)
+            {
+                order.phase = CelesFD_PersonnelOrder.Phase.Done;
+                Log.Error("[CelesFD] Personnel arrival aborted (map/beacon/questDef missing): " + def.defName);
+                return;
+            }
+            if (!MapUsable(map))   // 订单地图已失效（移出 Find.Maps）→ 零生成，走既有提前撤离结算（满完整度）
+            {
+                CancelPersonnelNoTarget(order, def);
+                return;
+            }
+            // ① 生成（BeaconFaction——忠实"星铃外勤部"身份；P4：与入舱同一操作）
+            var pawns = new List<Pawn>();
+            var weights = new List<float>();
+            Pawn anchor = null;
+            foreach (CelesFD_PersonnelEntry entry in def.personnel)
+            {
+                for (int i = 0; i < entry.amount; i++)
+                {
+                    Pawn p = PawnGenerator.GeneratePawn(new PawnGenerationRequest(
+                        entry.pawnKind, beacon, PawnGenerationContext.NonPlayer));
+                    // 机械体年龄修正（B——/100 等比映射：0~2500 → 0~25 年；测试实证 2026-09-06）
+                    //   走默认生成路径零参数修改，后处理缩放——biologicalAgeRange 因发育阶段冲突不可用
+                    if (p.RaceProps.IsMechanoid)
+                    {
+                        p.ageTracker.AgeBiologicalTicks /= 100;
+                        p.ageTracker.AgeChronologicalTicks /= 100;
+                    }
+                    pawns.Add(p);
+                    weights.Add(entry.weight);   // C3：权重快照与 pawns 索引对齐
+                    if (entry.isMechanitor && anchor == null) anchor = p;   // B+ 锚定者（仅标记条目——P16 v2）
+                }
+            }
+            // ② 落点两模式 + 分舱 + 投放（R3 修复：收拢 CelesFD_PawnDeliveryUtility——R-2/R-3 b 类直接复用）
+            IntVec3 dropCenter = CelesFD_PawnDeliveryUtility.DeliverPawns(map, pawns, def.landingMode, beacon);
+            // ③ slate 预置（P1：map 必设；名/描述/到期 letter 全旁路）→ quest 生成（autoAccept 同步翻转）
+            var slate = new RimWorld.QuestGen.Slate();
+            slate.Set("map", map);
+            slate.Set("asker", beacon);
+            slate.Set("helpers", pawns.AsEnumerable());
+            slate.Set("workers", pawns.Where(p => !p.RaceProps.IsMechanoid).AsEnumerable());   // 机械豁免
+            slate.Set("stayTicks", (long)order.orderedDays * CelesFD_PersonnelOrder.DayTicks);
+            slate.Set("supportDefName", def.defName);   // R-2：SupportLeave QuestNode 消费
+            slate.Set("workTags", def.workTagsToDisable);   // C2：禁工配置 per-def（SupportDef → slate → QuestNode）
+            slate.Set("resolvedQuestName", def.LabelCap);
+            slate.Set("resolvedQuestDescription",
+                "CelesFD_Keyed_PersonnelQuestDesc".Translate(beacon.Name, def.label, order.orderedDays));
+            Quest q = QuestUtility.GenerateQuestAndMakeAvailable(questDef, slate);
+            order.boundQuestId = q != null ? q.id : -1;   // 提前召回提前结束用
+            // ④ B+ 绑定（翻转后；原版 DEV Assign 三行配方 CompOverseerSubject.cs:225-244 + GetBrain/severity 守卫）
+            if (anchor != null && !anchor.Destroyed)
+            {
+                HediffDef boost = CelesFD_DefOf.Celes_FieldAidRestrict;   // T3：DefOf 引用
+                if (boost != null)
+                {
+                    Hediff h = anchor.health.AddHediff(boost, anchor.health.hediffSet.GetBrain());
+                    if (h != null) h.Severity = order.orderedDays * 0.01f;   // 天数×0.01（P16 v2——随驻留归零防俘虏白嫖）
+                }
+                foreach (Pawn mech in pawns)
+                {
+                    if (!mech.RaceProps.IsMechanoid) continue;
+                    mech.GetOverseer()?.relations.RemoveDirectRelation(PawnRelationDefOf.Overseer, mech);
+                    if (mech.Faction != Faction.OfPlayer) mech.SetFaction(Faction.OfPlayer);
+                    anchor.relations.AddDirectRelation(PawnRelationDefOf.Overseer, mech);
+                }
+            }
+            // ⑤ 注册（单据转 Deployed）
+            order.pawns.AddRange(pawns);
+            order.pawnWeights.AddRange(weights);
+            order.completenessBaseline = def.personnel.Sum(e => e.weight * e.amount);
+            order.stayUntilTick = Find.TickManager.TicksGame + (long)order.orderedDays * CelesFD_PersonnelOrder.DayTicks;
+            order.phase = CelesFD_PersonnelOrder.Phase.Deployed;
+            Messages.Message("CelesFD_Keyed_PersonnelArrived".Translate(def.LabelCap), MessageTypeDefOf.PositiveEvent);
+            Log.Message("[CelesFD] Personnel arrived: " + def.defName + " x" + pawns.Count
+                + " anchor=" + (anchor != null ? anchor.LabelShort : "无") + " quest spawned");
+        }
+
+        // ═══ 无降落点结算：抵达时刻订单地图已失效 → 不生成 pawn，复用提前撤离结算 ═══
+        // completeness = baseline/baseline = 1.0 → 最高档（fame/保险正常算法）；退款 = dailyWage × orderedDays 全额
+        // （抵达时刻 0 天已驻留 → daysLeft = orderedDays，与 TryEarlyRecall 同一算法）；空 edgePawns → 零 PendingSettlement
+        private void CancelPersonnelNoTarget(CelesFD_PersonnelOrder order, CelesFD_SupportDef def)
+        {
+            float baseline = def.personnel.Sum(e => e.weight * e.amount);
+            int creditBack = def.dailyWage * order.orderedDays;
+            if (creditBack > 0) ModifyCredit(creditBack);
+            CelesFD_Settlement.SettlePersonnel(this, def, baseline,
+                new List<Pawn>(), new Dictionary<string, float>(),
+                baseline, isEarlyRecall: true, recallRefundCredit: creditBack,
+                isWiped: false, isNoTarget: true);
+            order.phase = CelesFD_PersonnelOrder.Phase.Done;
+            Log.Message("[CelesFD] Personnel no-target settle (invalid map): " + def.defName + " refund=" + creditBack);
         }
 
         // ═══ 开局任务链：道歉信定时触发（3700 比较式——dev 快进跳变后条件立即成立；250 tick 节流精度足够） ═══
@@ -314,13 +619,28 @@ namespace CelesFeature
             }
         }
 
+        // ═══ 无效地图判据：Map 对象移出 Find.Maps 后仍存活（仅判 null 不足）——Disposed + 列表成员双重确认 ═══
+        private static bool MapUsable(Map m) => m != null && !m.Disposed && Find.Maps.Contains(m);
+
+        // 品名清单拼接（正常到货/虚空到货 letter 共用——复用三律②：第二消费者出现即提取并迁移全部消费者）
+        private static string LogisticsItemNames(CelesFD_LogisticsOrder lo)
+            => string.Join(", ", lo.items.Where(i => i.ThingDef != null).Select(i => i.ThingDef.label + "×" + i.amount));
+
         // 空投交付（G7 链路先例：DropPodUtility.DropThingsNear + TradeDropSpot，DebugActions.cs:96-113）
         // M7 合并：一批物品一次空投（同批次 = 一个物流单）
         private bool DeliverLogistics(CelesFD_LogisticsOrder lo)
         {
-            Map map = Find.CurrentMap;
-            if (map == null) map = Find.Maps.FirstOrDefault();   // 太空层无当前地图 → 任意殖民地地图
+            Map map = lo.targetMap != null ? lo.targetMap : Find.CurrentMap;   // C1 修复：下单图优先（旧档 null 回落）
+            if (map == null) map = Find.Maps.FirstOrDefault();   // 兜底：太空层无当前地图 → 任意殖民地地图
             if (map == null) return false;
+            if (!MapUsable(map))   // 订单地图已失效 → 投向虚空：不落地不退款，订单终结（letter 受 notifyArrival 门控）
+            {
+                if (lo.notifyArrival)
+                    Find.LetterStack.ReceiveLetter("CelesFD_Keyed_OrderArrivedTitle".Translate(),
+                        "CelesFD_Keyed_LogisticsVoidArrivedDesc".Translate(LogisticsItemNames(lo)), LetterDefOf.PositiveEvent);
+                Log.Message("[CelesFD] Logistics void-delivered (invalid map): " + lo.items.Count + " item(s)");
+                return true;
+            }
             var things = new List<Thing>();
             foreach (CelesFD_LogisticsItem item in lo.items)
             {
@@ -340,14 +660,12 @@ namespace CelesFeature
                 }
             }
             if (things.Count > 0)
-                DropPodUtility.DropThingsNear(DropCellFinder.TradeDropSpot(map), map, things,
+                DropPodUtility.DropThingsNear(CelesFD_PawnDeliveryUtility.ResolveDropCenter(map, CelesFD_PersonnelLandingMode.TradeBeacon), map, things,
                     faction: CelesFD_BeaconUtility.BeaconFaction);
             if (lo.notifyArrival)
             {
-                string names = string.Join(", ", lo.items
-                    .Where(i => i.ThingDef != null).Select(i => i.ThingDef.label + "×" + i.amount));
                 Find.LetterStack.ReceiveLetter("CelesFD_Keyed_OrderArrivedTitle".Translate(),
-                    "CelesFD_Keyed_OrderArrivedDesc".Translate(names), LetterDefOf.PositiveEvent);
+                    "CelesFD_Keyed_OrderArrivedDesc".Translate(LogisticsItemNames(lo)), LetterDefOf.PositiveEvent);
             }
             Log.Message($"[CelesFD] Logistics arrived: {lo.items.Count} item(s) ({(lo.expedited ? "expedited" : "standard")})");
             return true;
@@ -668,7 +986,8 @@ namespace CelesFeature
                 startTick = now,
                 arrivalTick = now + duration,
                 expedited = expedited,
-                notifyArrival = notifyArrival
+                notifyArrival = notifyArrival,
+                targetMap = Find.CurrentMap ?? Find.Maps.FirstOrDefault()   // 审查 C1 存量修复：到货图下单锁定
             };
             foreach (CelesFD_Order o in validOrders)
             {
@@ -827,6 +1146,8 @@ namespace CelesFeature
 
         // 每象已用武备额度（Scribe；自动刷新归零——见 ResetQuadrumCounters）
         public int quotaUsedThisQuadrum;
+        // W-5 顺带（2026-09-04）：初次购买赠送呼叫器（一次性 flag——武备方案 §2.1）
+        public bool FirstSupportPurchaseDone;
         // 本象武备额度刷新计次（Scribe；自动刷新归零——价格 2n+2 密钥递增）
         public int weaponRefreshCount;
         // 刷新冷却（真实时间 5s——同市场刷新 TryManualRefresh :494 模式）
@@ -955,10 +1276,78 @@ namespace CelesFeature
                 s.pending += item.Value;
                 s.pendingSinceTick = Find.TickManager.TicksGame;
             }
+            // 5. 初次购买赠送呼叫器（武备方案 §2.1——一次性，flag 短路零开销）
+            if (!FirstSupportPurchaseDone)
+            {
+                FirstSupportPurchaseDone = true;
+                DeliverSupportCallerGift();
+            }
             return true;
         }
 
+        // 初次购买武备支援：空投赠送一台支援呼叫信标（DeliverLogistics 同款链——TradeDropSpot + BeaconFaction）
+        private void DeliverSupportCallerGift()
+        {
+            Map map = Find.CurrentMap ?? Find.Maps.FirstOrDefault();
+            if (map == null)
+            {
+                Log.Warning("[CelesFD] First support caller gift: no map available");
+                return;
+            }
+            Thing caller = ThingMaker.MakeThing(CelesFD_DefOf.CelesFD_SupportCaller);
+            DropPodUtility.DropThingsNear(CelesFD_PawnDeliveryUtility.ResolveDropCenter(map, CelesFD_PersonnelLandingMode.TradeBeacon), map,
+                new List<Thing> { caller },
+                faction: CelesFD_BeaconUtility.BeaconFaction);
+            Find.LetterStack.ReceiveLetter(
+                "CelesFD_Keyed_SupportCallerGiftTitle".Translate(),
+                "CelesFD_Keyed_SupportCallerGiftDesc".Translate(),
+                LetterDefOf.PositiveEvent,
+                new LookTargets(new TargetInfo(caller.Position, map)));
+            Log.Message("[CelesFD] First support purchase: caller gifted via air drop at " + caller.Position);
+        }
+
         // W-3 武备页提交：draft（尝试申请的）入账 pending + 审批计时起点；上限 maxTotal
+        // ═══ 提前召回（k 终版 2026-09-06）：±区域替换按钮 + 确认态；退款 = 雇佣金 × 剩余天数(向下取整)；
+        //   R-1 临时 = quest 提前 End（Cleanup→边缘走出）+ 退款 message；R-2 替换正式离场序列并把退款行
+        //   附加结算 letter 末行（PersonnelRecallRefund 键复用）。单份锁保底保留（防 UI 强行双开）═══
+        public void TryEarlyRecall(CelesFD_SupportDef def)
+        {
+            CelesFD_PersonnelOrder order = null;
+            foreach (CelesFD_PersonnelOrder o in PersonnelOrders)
+                if (o.supportDefName == def.defName
+                    && (o.phase == CelesFD_PersonnelOrder.Phase.Deployed || o.phase == CelesFD_PersonnelOrder.Phase.LeavingSoon))
+                { order = o; break; }
+            if (order == null)
+            {
+                Log.Message("[CelesFD] Early recall: no active order (" + def.defName + ")");
+                return;
+            }
+            int daysLeft = (int)Mathf.Max(0f, (order.stayUntilTick - Find.TickManager.TicksGame) / (float)CelesFD_PersonnelOrder.DayTicks);
+            int creditBack = def.dailyWage * daysLeft;
+            if (creditBack > 0) ModifyCredit(creditBack);
+            order.recallRefundCredit = creditBack;
+            Log.Message("[CelesFD] Early recall: " + def.defName + " daysLeft=" + daysLeft + " refund=" + creditBack);
+            // R-2：直接找到 QuestPart 并调用公共方法（绕过信号路由——Bug1 附带修复）
+            if (order.boundQuestId >= 0)
+            {
+                foreach (Quest q in Find.QuestManager.QuestsListForReading)
+                    if (q.id == order.boundQuestId && q.State == QuestState.Ongoing)
+                    {
+                        foreach (QuestPart part in q.PartsListForReading)
+                            if (part is CelesFD_QuestPart_SupportLeave supportLeave)
+                            {
+                                supportLeave.isEarlyRecall = true;
+                                supportLeave.recallRefundCredit = creditBack;
+                                supportLeave.ExecuteLeaveSequence();   // 公共方法直接调用
+                                break;
+                            }
+                        break;
+                    }
+            }
+        }
+
+        // ═══ R-2：结算体系已分离至 CelesFD_Settlement.cs（避免大文件 sed 损坏）═══
+
         public bool TrySubmitSupportRequest(CelesFD_SupportDef def, int draft)
         {
             if (draft <= 0) return false;

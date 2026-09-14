@@ -56,6 +56,7 @@ namespace CelesFeature
         // W-4（2026-09-04 用户需求）：即将抵达倒计时——两阶段交付（机制预演）
         public long countdownStartTick = -1;   // -1 = 未进入倒计时（阶段 1 运输中）；>0 = 已进入（阶段 2）
         public const int CountdownTicks = 300; // 倒计时时长 5 秒（对照支援 arrivalDelayTicks 默认 300）
+        public Map targetMap;                  // 审查 C1 存量修复：到货图下单锁定（旧档 null 回落 CurrentMap）
 
         public void ExposeData()
         {
@@ -65,6 +66,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref expedited, "expedited", false);
             Scribe_Values.Look(ref notifyArrival, "notifyArrival", false);
             Scribe_Values.Look(ref countdownStartTick, "countdownStartTick", -1L);
+            Scribe_References.Look(ref targetMap, "targetMap");
             if (items == null) items = new List<CelesFD_LogisticsItem>();
         }
     }

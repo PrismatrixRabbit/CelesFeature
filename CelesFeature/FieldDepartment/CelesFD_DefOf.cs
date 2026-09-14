@@ -31,6 +31,9 @@ namespace CelesFeature
         public static JobDef CelesFD_SupportCall;
         // W-1.5：投掷式呼叫信标
         public static ThingDef CelesFD_SupportBeacon;
+        // R-1：人员支援（T3——替代运行期 GetNamed 字符串查找）
+        public static QuestScriptDef CelesFD_QuestDef_SupportReinforcement;
+        public static HediffDef Celes_FieldAidRestrict;
 
         // 开局任务链（2026-08-25）
         public static ThingDef CelesFD_Antenna;

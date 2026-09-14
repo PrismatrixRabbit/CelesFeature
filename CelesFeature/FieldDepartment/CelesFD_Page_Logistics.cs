@@ -18,33 +18,12 @@ namespace CelesFeature
     {
         static CelesFD_Page_Logistics()
         {
-            _ = CircleTex;   // 主线程预初始化圆纹理（防 UI 首次绘制时才创建）
+            _ = CelesFD_UIConfig.CircleTex;   // 主线程预初始化（C 提取：CircleTex 已迁 UIConfig）
         }
         private Vector2 inTransitScrollPos;
         private Vector2 historyScrollPos;
+        private bool infoActive;   // ？帮助（R-1 UI 改造：子页显示物流页机制介绍）
 
-        // 节点"圈"纹理（UI 层无现成圆点——自生成白色圆，静态缓存）
-        private static Texture2D circleTex;
-        private static Texture2D CircleTex
-        {
-            get
-            {
-                if (circleTex == null)
-                {
-                    const int size = 16;
-                    circleTex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-                    float r = size / 2f - 0.5f;
-                    for (int y = 0; y < size; y++)
-                        for (int x = 0; x < size; x++)
-                        {
-                            float dx = x - r, dy = y - r;
-                            circleTex.SetPixel(x, y, dx * dx + dy * dy <= r * r ? Color.white : Color.clear);
-                        }
-                    circleTex.Apply();
-                }
-                return circleTex;
-            }
-        }
 
         public string Title => "CelesFD_Keyed_Tab_Logistics".Translate();
 
@@ -60,21 +39,63 @@ namespace CelesFeature
             DrawHistory(right.ContractedBy(4f), gc);
         }
 
-        // 左：发送中物流卡片
+        // 左：发送中物流卡片（R-1：物品单 + 人员物流单混排——人员 Transit 段入列，Instant 模式无物流段）
         private void DrawInTransit(Rect rect, CelesFD_GameComponent gc)
         {
             Widgets.Label(new Rect(rect.x, rect.y, rect.width, 24f), "CelesFD_Keyed_LogisticsInTransit".Translate());
             Rect listRect = new Rect(rect.x, rect.y + 26f, rect.width, rect.yMax - (rect.y + 26f));
             const float cardH = 82f;   // 交易页 CardMinHeight 同高（用户裁决）
             const float cardGap = 4f;
-            float contentH = Mathf.Max(listRect.height, gc.InTransitList.Count * (cardH + cardGap));
+            var personnelTransit = new List<CelesFD_PersonnelOrder>();
+            foreach (CelesFD_PersonnelOrder po in gc.PersonnelOrders)
+                if (po.phase == CelesFD_PersonnelOrder.Phase.Transit && po.Def != null
+                    && po.Def.arrivalMode != CelesFD_PersonnelArrivalMode.Instant)
+                    personnelTransit.Add(po);
+            int totalCards = gc.InTransitList.Count + personnelTransit.Count;
+            float contentH = Mathf.Max(listRect.height, totalCards * (cardH + cardGap));
             Widgets.BeginScrollView(listRect, ref inTransitScrollPos, new Rect(0f, 0f, listRect.width - 16f, contentH));
             for (int i = 0; i < gc.InTransitList.Count; i++)
             {
                 Rect card = new Rect(0f, i * (cardH + cardGap), listRect.width - 16f, cardH);
                 DrawLogisticsCard(card, gc.InTransitList[i]);
             }
+            for (int i = 0; i < personnelTransit.Count; i++)
+            {
+                Rect card = new Rect(0f, (gc.InTransitList.Count + i) * (cardH + cardGap), listRect.width - 16f, cardH);
+                DrawPersonnelTransitCard(card, personnelTransit[i]);
+            }
             Widgets.EndScrollView();
+        }
+
+        // R-1：人员物流卡片（上区 = icon + 名 + 右三行[段文案（共享基类）/类型/剩余]；下区简单进度条）
+        private void DrawPersonnelTransitCard(Rect rect, CelesFD_PersonnelOrder po)
+        {
+            long now = Find.TickManager.TicksGame;
+            CelesFD_SupportDef def = po.Def;
+            Widgets.DrawBoxSolid(rect, new Color(0.13f, 0.13f, 0.13f, 0.6f));
+            float subH = CelesFD_UIConfig.ScaledLineHeight(CelesFD_UIConfig.FontSub);
+            Rect upper = new Rect(rect.x, rect.y, rect.width, 62f);
+            float iconSize = 40f;
+            if (!def.uiIcon.NullOrEmpty())
+            {
+                Texture2D icon = ContentFinder<Texture2D>.Get(def.uiIcon, false);
+                if (icon != null) GUI.DrawTexture(new Rect(upper.x + 4f, upper.y + 4f, iconSize, iconSize), icon, ScaleMode.ScaleToFit);
+            }
+            DrawScaledLabel(new Rect(upper.x + 4f, upper.y + 46f, upper.width - 130f, subH), def.LabelCap, CelesFD_UIConfig.FontSub);
+            float rightW = 110f;
+            var provider = CelesFD_TransitStageProvider.For(def.arrivalMode);
+            DrawScaledLabel(new Rect(upper.xMax - rightW, upper.y + 4f, rightW - 4f, subH),
+                provider.CurrentStageKey(po.startTick, now).Translate(), CelesFD_UIConfig.FontSub);
+            DrawScaledLabel(new Rect(upper.xMax - rightW, upper.y + 8f + subH, rightW - 4f, subH),
+                (def.arrivalMode == CelesFD_PersonnelArrivalMode.Expedited
+                    ? "CelesFD_Keyed_ExpediteTag" : "CelesFD_Keyed_StandardTag").Translate(), CelesFD_UIConfig.FontSub);
+            DrawScaledLabel(new Rect(upper.xMax - rightW, upper.y + 12f + subH * 2f, rightW - 4f, subH),
+                "CelesFD_Keyed_LogisticsRemain".Translate(
+                    Mathf.Max(0, (int)(po.transitEndTick - now)).ToStringTicksToPeriod()), CelesFD_UIConfig.FontSub);
+            Rect lower = new Rect(rect.x, rect.y + 66f, rect.width, rect.height - 66f);
+            // C 提取：共用 helper（物品/人员两族唯一实现）
+            int nodeCount = def.arrivalMode == CelesFD_PersonnelArrivalMode.Expedited ? 4 : 6;
+            CelesFD_UIConfig.DrawNodeProgressLine(lower, po.startTick, provider.TransitTicks, nodeCount);
         }
 
         // 物流卡片（用户规格：上区 icon 前 5 + label 截断 + 右状态/剩余；下区节点进度条等分）
@@ -115,73 +136,34 @@ namespace CelesFeature
             DrawScaledLabel(new Rect(upper.xMax - rightW, ry, rightW - 4f, subH),
                 "CelesFD_Keyed_LogisticsRemain".Translate(Mathf.Max(0, remain).ToStringTicksToPeriod()), CelesFD_UIConfig.FontSub);
             // 下区：节点进度条（左右 10px、节点均分、时间等分——用户裁决）
-            Rect lower = new Rect(rect.x, rect.y + 66f, rect.width, rect.yMax - 66f);
+            Rect lower = new Rect(rect.x, rect.y + 66f, rect.width, rect.height - 66f);
             DrawNodeProgress(lower, lo, now);
         }
 
-        // 节点文段（用户规格：右区第一行——当前阶段；与 DrawNodeProgress 同"节点数-1 段等分"：
-        //   标准 5 段×4.8h / 加急 3 段×20 分钟；t ≥ 总时长 = 正在运输中）
+        // 节点文段（用户规格：右区第一行——当前阶段）：审查 R2 修复——迁移共享基类（推进逻辑唯一实现，
+        //   段键沿用物品侧既有 Keyed，行为不变）；t ≥ 总时长 = 正在运输中（物品侧终态文案，基类外保留）
         private static string StageText(CelesFD_LogisticsOrder lo, long now)
         {
-            float t = now - lo.startTick;
-            float total = lo.expedited ? 2500f : 60000f;
-            if (t >= total) return "CelesFD_Keyed_StageInTransit".Translate();
-            int segCount = lo.expedited ? 3 : 5;
-            float seg = total / segCount;
-            int idx = Mathf.Clamp((int)(t / seg), 0, segCount - 1);
-            if (lo.expedited)
-            {
-                switch (idx)
-                {
-                    case 0: return "CelesFD_Keyed_StageSkipPaperwork".Translate();
-                    case 1: return "CelesFD_Keyed_StageTossCargo".Translate();
-                    default: return "CelesFD_Keyed_StageBypassLaunch".Translate();
-                }
-            }
-            switch (idx)
-            {
-                case 0: return "CelesFD_Keyed_StageConfirming".Translate();
-                case 1: return "CelesFD_Keyed_StageWarehouse".Translate();
-                case 2: return "CelesFD_Keyed_StageFueling".Translate();
-                case 3: return "CelesFD_Keyed_StageLoading".Translate();
-                default: return "CelesFD_Keyed_StageLaunchQueue".Translate();
-            }
+            var provider = lo.expedited
+                ? (CelesFD_TransitStageProvider)new CelesFD_TransitStage_ItemExpedited()
+                : new CelesFD_TransitStage_ItemStandard();
+            if (now - lo.startTick >= provider.TransitTicks) return "CelesFD_Keyed_StageInTransit".Translate();
+            return provider.CurrentStageKey(lo.startTick, now).Translate();
         }
 
-        // 节点进度条：○——○——○ 圈+线；时间等分（标准 5 段×4.8h / 加急 3 段×20 分钟——节点数-1 段）；抵达节点亮起
+        // 节点进度条（C 提取：改调 UIConfig 共用 helper——DrawNodeProgressLine 唯一实现）
         private void DrawNodeProgress(Rect rect, CelesFD_LogisticsOrder lo, long now)
         {
             int nodeCount = lo.expedited ? 4 : 6;
-            float totalTicks = lo.expedited ? 2500f : 60000f;
-            float t = now - lo.startTick;
-            float margin = 10f;
-            float lineY = rect.y + rect.height / 2f;
-            float x0 = rect.x + margin;
-            float x1 = rect.xMax - margin;
-            float nodeGap = (x1 - x0) / (nodeCount - 1);
-            float nodeSize = 8f;
-            // 背景线
-            Widgets.DrawLineHorizontal(x0, lineY, x1 - x0, new Color(0.35f, 0.35f, 0.35f));
-            // 已抵达段：亮线（节点均分 → 每段时长 = totalTicks / (nodeCount - 1)）
-            float segTicks = totalTicks / (nodeCount - 1);
-            int litSegs = Mathf.Clamp((int)(t / segTicks), 0, nodeCount - 1);
-            if (litSegs > 0)
-                Widgets.DrawLineHorizontal(x0, lineY, litSegs * nodeGap, new Color(0.45f, 0.75f, 0.95f));
-            // 节点圈（抵达亮起）
-            for (int i = 0; i < nodeCount; i++)
-            {
-                float nodeX = x0 + i * nodeGap;
-                bool lit = t >= i * segTicks - 1f;   // -1 容差
-                GUI.color = lit ? new Color(0.45f, 0.75f, 0.95f) : new Color(0.4f, 0.4f, 0.4f);
-                GUI.DrawTexture(new Rect(nodeX - nodeSize / 2f, lineY - nodeSize / 2f, nodeSize, nodeSize), CircleTex);
-                GUI.color = Color.white;
-            }
+            long totalTicks = lo.expedited ? 2500L : 60000L;
+            CelesFD_UIConfig.DrawNodeProgressLine(rect, lo.startTick, totalTicks, nodeCount);
         }
 
         // 右：已完成历史（双列卡片网格——同交易页 CalcCardGrid；CelesFD_OrderCard.DrawArchive 静态卡，用户裁决 2026-08-15）
         private void DrawHistory(Rect rect, CelesFD_GameComponent gc)
         {
-            Widgets.Label(new Rect(rect.x, rect.y, rect.width, 24f), "CelesFD_Keyed_LogisticsHistory".Translate());
+            Widgets.Label(new Rect(rect.x, rect.y, rect.width - 30f, 24f), "CelesFD_Keyed_LogisticsHistory".Translate());
+            if (CelesFD_UIConfig.DrawHelpButton(rect.xMax - 24f, rect.y, 24f)) infoActive = !infoActive;
             Rect listRect = new Rect(rect.x, rect.y + 26f, rect.width, rect.yMax - (rect.y + 26f));
             CelesFD_UIConfig.CalcCardGrid(listRect, gc.OrderArchive.Count, out float cardW, out float cardH, out float totalH);
             float contentH = Mathf.Max(listRect.height, totalH);
@@ -226,6 +208,12 @@ namespace CelesFeature
         {
             Widgets.DrawMenuSection(rect);
             Rect inner = rect.ContractedBy(10f);
+            // ？帮助（R-1 UI 改造）优先：物流页机制介绍（替代常态站点状态）
+            if (infoActive)
+            {
+                CelesFD_UIConfig.DrawInfoText(inner, "CelesFD_Keyed_InfoLogistics".Translate());
+                return;
+            }
             Widgets.Label(new Rect(inner.x, inner.y, inner.width, 24f), "CelesFD_Keyed_LogisticsStatus".Translate());
 
             List<Settlement> stations = CelesFD_BeaconUtility.GetStations();   // 站数极少，每帧查询可接受；量大时实现期缓存
@@ -260,6 +248,6 @@ namespace CelesFeature
             Text.WordWrap = prevWrap;
         }
 
-        public void Notify_Deactivated() { }
+        public void Notify_Deactivated() { infoActive = false; }   // R-1 风格批：切页重置 ？态
     }
 }

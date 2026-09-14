@@ -110,29 +110,78 @@ namespace CelesFeature
             Thing meal = ThingMaker.MakeThing(ThingDefOf.MealSimple);
             meal.stackCount = 50;
             things.Add(meal);
-            DropPodUtility.DropThingsNear(DropCellFinder.TradeDropSpot(map), map, things, faction: beacon);
+            DropPodUtility.DropThingsNear(CelesFD_PawnDeliveryUtility.ResolveDropCenter(map, CelesFD_PersonnelLandingMode.TradeBeacon), map, things, faction: beacon);
             Log.Message("[CelesFD] Debug drop spawned near trade spot (steel x100, meal x50)");
+        }
+
+        // ═══ R-1（2026-09-06）：人员支援 dev 件（探针已删除——其结论全部内化进正式实现）═══
+        [DebugAction("CelesFD", "Personnel: log deployments")]
+        private static void PersonnelLogDeployments()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null || gc.PersonnelOrders.Count == 0)
+            {
+                Log.Message("[CelesFD] Personnel: no orders");
+                return;
+            }
+            var buf = new List<Verse.Pawn>();
+            foreach (CelesFD_PersonnelOrder o in gc.PersonnelOrders)
+            {
+                o.AlivePawns(buf);
+                Log.Message("[CelesFD] Personnel " + o.supportDefName + ": phase=" + o.phase
+                    + " days=" + o.orderedDays
+                    + " stayLeft=" + (o.stayUntilTick > 0 ? ((o.stayUntilTick - Verse.Find.TickManager.TicksGame) / 2500L + 1) + "h" : "-")
+                    + " alive=" + buf.Count + "/" + o.pawns.Count
+                    + " completeness=" + o.CurrentCompleteness().ToString("F3")
+                    + " baseline=" + o.completenessBaseline);
+            }
+        }
+
+        [DebugAction("CelesFD", "Personnel: force next phase")]
+        private static void PersonnelForceNextPhase()
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            if (gc == null) return;
+            long now = Verse.Find.TickManager.TicksGame;
+            foreach (CelesFD_PersonnelOrder o in gc.PersonnelOrders)
+            {
+                switch (o.phase)
+                {
+                    case CelesFD_PersonnelOrder.Phase.Transit:
+                        o.transitEndTick = now;   // 下轮询即转 Incoming
+                        Log.Message("[CelesFD] Personnel " + o.supportDefName + ": Transit -> Incoming (next poll)");
+                        break;
+                    case CelesFD_PersonnelOrder.Phase.Incoming:
+                        o.incomingStartTick = now - 100000;   // 强制落地（轮询触发 ExecutePersonnelArrival）
+                        Log.Message("[CelesFD] Personnel " + o.supportDefName + ": Incoming -> arrival (next poll)");
+                        break;
+                    case CelesFD_PersonnelOrder.Phase.Deployed:
+                        o.stayUntilTick = now + CelesFD_PersonnelOrder.LeavingWarnTicks + 100;   // 直接进 LeavingSoon
+                        Log.Message("[CelesFD] Personnel " + o.supportDefName + ": -> LeavingSoon");
+                        break;
+                }
+            }
         }
 
         private static void AddIntOptions(List<DebugMenuOption> options, string label, int current, System.Action<int> setter)
         {
             options.Add(new DebugMenuOption(label + " +100 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current + 100); Log.Message(label + " -> " + (current + 100)); }));
+                delegate { setter(current + 100); Log.Message("[CelesFD] " + label + " -> " + (current + 100)); }));
             options.Add(new DebugMenuOption(label + " -100 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current - 100); Log.Message(label + " -> " + (current - 100)); }));
+                delegate { setter(current - 100); Log.Message("[CelesFD] " + label + " -> " + (current - 100)); }));
             options.Add(new DebugMenuOption(label + " = 0", DebugMenuOptionMode.Action,
-                delegate { setter(0); Log.Message(label + " -> 0"); }));
+                delegate { setter(0); Log.Message("[CelesFD] " + label + " -> 0"); }));
         }
 
         // 等级等小值字段：±1 粒度（v4.7）
         private static void AddIntOptionsFine(List<DebugMenuOption> options, string label, int current, System.Action<int> setter)
         {
             options.Add(new DebugMenuOption(label + " +1 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current + 1); Log.Message(label + " -> " + (current + 1)); }));
+                delegate { setter(current + 1); Log.Message("[CelesFD] " + label + " -> " + (current + 1)); }));
             options.Add(new DebugMenuOption(label + " -1 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current - 1); Log.Message(label + " -> " + (current - 1)); }));
+                delegate { setter(current - 1); Log.Message("[CelesFD] " + label + " -> " + (current - 1)); }));
             options.Add(new DebugMenuOption(label + " = 0", DebugMenuOptionMode.Action,
-                delegate { setter(0); Log.Message(label + " -> 0"); }));
+                delegate { setter(0); Log.Message("[CelesFD] " + label + " -> 0"); }));
         }
 
         // Credit/TradeVolume 等大值字段：±100 基础上增 ±1000/±10000（v4.7）
@@ -140,13 +189,13 @@ namespace CelesFeature
         {
             AddIntOptions(options, label, current, setter);
             options.Add(new DebugMenuOption(label + " +1000 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current + 1000); Log.Message(label + " -> " + (current + 1000)); }));
+                delegate { setter(current + 1000); Log.Message("[CelesFD] " + label + " -> " + (current + 1000)); }));
             options.Add(new DebugMenuOption(label + " -1000 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current - 1000); Log.Message(label + " -> " + (current - 1000)); }));
+                delegate { setter(current - 1000); Log.Message("[CelesFD] " + label + " -> " + (current - 1000)); }));
             options.Add(new DebugMenuOption(label + " +10000 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current + 10000); Log.Message(label + " -> " + (current + 10000)); }));
+                delegate { setter(current + 10000); Log.Message("[CelesFD] " + label + " -> " + (current + 10000)); }));
             options.Add(new DebugMenuOption(label + " -10000 (" + current + ")", DebugMenuOptionMode.Action,
-                delegate { setter(current - 10000); Log.Message(label + " -> " + (current - 10000)); }));
+                delegate { setter(current - 10000); Log.Message("[CelesFD] " + label + " -> " + (current - 10000)); }));
         }
 
         // G9 验证辅助：星铃殖民者离场测试（Farskip 特效 + 移出地图 + KeepForever 世界化，CelesFD_PawnDeparture_Test）

@@ -1,24 +1,26 @@
 using System.Collections.Generic;
-using RimWorld;
 using Verse;
 
 namespace CelesFeature
 {
     // W-2a：支援效果触发上下文（信标 → 效果的单次传递）
+    // W-5 签名升级：单格 → 格集（landingRule 统一返回 List；Cell 保留为 Cells[0] 只读别名——
+    //   全仓零写入方[实证]，单落点效果[TrackingBeam 等]零改动兼容）
     public class CelesFD_EffectContext
     {
         public CelesFD_SupportBeacon Beacon;
         public Map Map;
-        public IntVec3 Cell;           // 落点（landingRule 已解析）
+        public List<IntVec3> Cells;        // 落点集（landingRule 已解析；信标保证非空）
+        public IntVec3 Cell => Cells[0];   // 兼容别名（首个落点）
         public CelesFD_SupportDef SupportDef;
-        public IntVec3 OriginCell;     // 投掷者投出时刻位置（方向源——W-2b 渐进弹幕/一字烟幕连线基准）
+        public IntVec3 OriginCell;     // 投掷者投出时刻位置（方向源——W-2b 连线基准）
         public Pawn Caster;            // 投掷者（敌对判定基准——W-2b；裁决 2026-09-03：与投掷者派系敌对）
 
-        public CelesFD_EffectContext(CelesFD_SupportBeacon beacon, IntVec3 cell)
+        public CelesFD_EffectContext(CelesFD_SupportBeacon beacon, List<IntVec3> cells)
         {
             Beacon = beacon;
             Map = beacon.Map;
-            Cell = cell;
+            Cells = cells;
             SupportDef = beacon.SupportDef;
             OriginCell = beacon.originCell;
             Caster = beacon.caster;
@@ -34,6 +36,7 @@ namespace CelesFeature
     // W-2a：支援效果基类——一个效果一个子类，参数全在子类字段（XML 可调）
     // XML 载体：<effect Class="CelesFeature.XxxEffect">（单字段 Class 节点——A2-9，
     //   QuestScriptDef.root 同构先例；扩展 Mod 子类化 + 写 XML 即注入，零注册）
+    // W-5 效果收口：Drop（即刻投放）+ Barrage（排程投放）+ TrackingBeam（跟踪）三种
     public abstract class CelesFD_SupportEffect
     {
         public abstract void Trigger(CelesFD_EffectContext ctx);
@@ -44,26 +47,5 @@ namespace CelesFeature
     public interface CelesFD_IControllerTicksRemaining
     {
         int EstimatedTicksRemaining { get; }
-    }
-
-    // a-1 早期武备空投：复用坠落系统建筑容器链（W-2a 基础代码层）
-    // 坠落物 = crateDef.fallerDef（Decelerate 减速姿态/贴图由 fallerDef 配置——A2-10 裁决：速度绑定 fallerDef）
-    public class CelesFD_Effect_CrateDrop : CelesFD_SupportEffect
-    {
-        public CelesFD_DropCrateDef crateDef;
-
-        public override void Trigger(CelesFD_EffectContext ctx)
-        {
-            if (crateDef == null || crateDef.fallerDef == null)
-            {
-                Log.Warning("[CelesFD] Effect_CrateDrop missing crateDef/fallerDef (support " + (ctx.SupportDef != null ? ctx.SupportDef.defName : "null") + ")");
-                return;
-            }
-            // 内胆必须经 ThingMaker 生成（IncidentWorker_OrbitDrop.SpawnBuildingDrop 同款——
-            //   裸 new ActiveTransporter 缺 def/SpawnSetup，Skyfaller Tick 访问 inner 时 NRE）
-            ActiveTransporter info = (ActiveTransporter)ThingMaker.MakeThing(ThingDefOf.ActiveDropPod);
-            Skyfaller faller = SkyfallerMaker.SpawnSkyfaller(crateDef.fallerDef, info, ctx.Cell, ctx.Map);
-            ctx.RegisterController(faller);
-        }
     }
 }

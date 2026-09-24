@@ -9,20 +9,20 @@ namespace CelesFeature
     // 尸体燃料通道（原版无此机制，必要自建）：
     // [事实] 结算直调 public Refuel(amount)（CompRefuelable.cs:275-283）进入原版燃料池，
     // 消耗/停机/告警/自动补料全走原版；Refuelable 分组为 HasAssignableCompFrom（ThingListGroupHelper.cs:97），无需子类化
-    public class Celes_CompProperties_CorpseFuel : CompProperties
+    public class CelesIM_CompProperties_CorpseFuel : CompProperties
     {
         public List<ThingDef> corpseBlacklist;
         public float maxCorpseCharge = 2.0f;
 
-        public Celes_CompProperties_CorpseFuel()
+        public CelesIM_CompProperties_CorpseFuel()
         {
-            compClass = typeof(Celes_CompCorpseFuel);
+            compClass = typeof(CelesIM_CompCorpseFuel);
         }
     }
 
-    public class Celes_CompCorpseFuel : ThingComp
+    public class CelesIM_CompCorpseFuel : ThingComp
     {
-        public Celes_CompProperties_CorpseFuel Props => (Celes_CompProperties_CorpseFuel)props;
+        public CelesIM_CompProperties_CorpseFuel Props => (CelesIM_CompProperties_CorpseFuel)props;
 
         public bool CanAcceptCorpse(Corpse corpse)
         {

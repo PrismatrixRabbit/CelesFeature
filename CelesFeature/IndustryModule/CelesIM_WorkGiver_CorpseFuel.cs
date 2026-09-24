@@ -15,7 +15,7 @@ namespace CelesFeature
     // 尸体投入培育器：仅玩家强制（右键尸体 → "优先投入"），AI 不自动执行
     // [事实] 原版强制菜单机制：FloatMenuMakerMap 以 forced:true 调 JobOnThing；
     // HasJobOnThing 恒 false → JobGiver_Work 永不自动派单（WorkGiver_Scanner 基类默认 false）
-    public class Celes_WorkGiver_CorpseFuel : WorkGiver_Scanner
+    public class CelesIM_WorkGiver_CorpseFuel : WorkGiver_Scanner
     {
         public override ThingRequest PotentialWorkThingRequest => ThingRequest.ForGroup(ThingRequestGroup.Corpse);
 
@@ -46,7 +46,7 @@ namespace CelesFeature
             for (int i = 0; i < buildings.Count; i++)
             {
                 Building building = buildings[i];
-                Celes_CompCorpseFuel comp = building.TryGetComp<Celes_CompCorpseFuel>();
+                CelesIM_CompCorpseFuel comp = building.TryGetComp<CelesIM_CompCorpseFuel>();
                 if (comp == null || !comp.CanAcceptCorpse(corpse))
                     continue;
                 float distSq = (building.Position - corpse.Position).LengthHorizontalSquared;

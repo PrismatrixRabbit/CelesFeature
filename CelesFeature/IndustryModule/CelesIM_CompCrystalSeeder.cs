@@ -6,7 +6,7 @@ using Verse;
 namespace CelesFeature
 {
     // 培育器/晶种共享的判定链参数基类
-    public class Celes_CompProperties_CrystalGrowth : CompProperties
+    public class CelesIM_CompProperties_CrystalGrowth : CompProperties
     {
         public int ticksToGrow = 10000;
         public float growRadius = 9.9f;
@@ -22,29 +22,29 @@ namespace CelesFeature
         public TerrainDef spawnTerrain;   // 晶簇生成位置创建的地板（layerable 晶化表面）
     }
 
-    public class Celes_CompProperties_CrystalSeeder : Celes_CompProperties_CrystalGrowth
+    public class CelesIM_CompProperties_CrystalSeeder : CelesIM_CompProperties_CrystalGrowth
     {
-        public Celes_CompProperties_CrystalSeeder()
+        public CelesIM_CompProperties_CrystalSeeder()
         {
-            compClass = typeof(Celes_CompCrystalSeeder);
+            compClass = typeof(CelesIM_CompCrystalSeeder);
         }
     }
 
-    public class Celes_CompCrystalSeeder : ThingComp
+    public class CelesIM_CompCrystalSeeder : ThingComp
     {
         private int nextGrowTick;
         private bool autoMarkHarvest;
 
         [Unsaved] private CompRefuelable refuelable;
-        [Unsaved] private CompThreadConsumer threadComp;
+        [Unsaved] private CelesIM_CompThreadConsumer threadComp;
 
-        public Celes_CompProperties_CrystalGrowth Props => (Celes_CompProperties_CrystalGrowth)props;
+        public CelesIM_CompProperties_CrystalGrowth Props => (CelesIM_CompProperties_CrystalGrowth)props;
 
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);
             refuelable = parent.GetComp<CompRefuelable>();
-            threadComp = parent.GetComp<CompThreadConsumer>();
+            threadComp = parent.GetComp<CelesIM_CompThreadConsumer>();
             if (!respawningAfterLoad)
             {
                 nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
@@ -68,7 +68,7 @@ namespace CelesFeature
             if (Find.TickManager.TicksGame < nextGrowTick || !hasFuel || !threadOk)
                 return;
             nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
-            Celes_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props,
+            CelesIM_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props,
                 cell => Props.terrainToGrow != null && Props.terrainToGrow.Contains(parent.Map.terrainGrid.TerrainAt(cell)),
                 null);
             if (autoMarkHarvest)
@@ -89,14 +89,14 @@ namespace CelesFeature
                 List<Thing> things = parent.Map.thingGrid.ThingsListAtFast(cell);
                 for (int i = 0; i < things.Count; i++)
                 {
-                    if (things[i] is Celes_CrystalCluster cluster && cluster.Level >= maxLevel
+                    if (things[i] is CelesIM_CrystalCluster cluster && cluster.Level >= maxLevel
                         && parent.Map.designationManager.DesignationAt(cluster.Position, DesignationDefOf.Mine) == null)
                         parent.Map.designationManager.AddDesignation(new Designation(cluster.Position, DesignationDefOf.Mine));
                 }
             }
         }
 
-        // 选中圈：显示 growRadius 生效范围（类太阳灯，放置 ghost 见 PlaceWorker_CrystalGrowRadius）
+        // 选中圈：显示 growRadius 生效范围（类太阳灯，放置 ghost 见 CelesIM_PlaceWorker_CrystalGrowRadius）
         public override void PostDrawExtraSelectionOverlays()
         {
             GenDraw.DrawRadiusRing(parent.Position, Props.growRadius);
@@ -108,8 +108,8 @@ namespace CelesFeature
             Command_Toggle toggle = new Command_Toggle();
             toggle.isActive = () => autoMarkHarvest;
             toggle.toggleAction = () => autoMarkHarvest = !autoMarkHarvest;
-            toggle.defaultLabel = "自动标记开采";
-            toggle.defaultDesc = "开启后每次生长检测自动为已达最高等级的晶簇标记开采指令。";
+            toggle.defaultLabel = "CelesIM_Keyed_AutoMarkLabel".Translate();
+            toggle.defaultDesc = "CelesIM_Keyed_AutoMarkDesc".Translate();
             toggle.icon = ContentFinder<Texture2D>.Get("UI/Designators/Mine");
             yield return toggle;
             if (DebugSettings.ShowDevGizmos)
@@ -124,7 +124,8 @@ namespace CelesFeature
 
         public override string CompInspectStringExtra()
         {
-            string text = "自动标记开采: " + (autoMarkHarvest ? "开" : "关");
+            string text = "CelesIM_Keyed_AutoMarkStatus".Translate(
+                autoMarkHarvest ? "CelesIM_Keyed_On".Translate() : "CelesIM_Keyed_Off".Translate());
             if (Prefs.DevMode)
             {
                 int remain = nextGrowTick - Find.TickManager.TicksGame;

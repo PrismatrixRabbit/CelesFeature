@@ -6,7 +6,7 @@ using Verse;
 namespace CelesFeature
 {
     // [事实] 晶簇等级贴图：覆写 Graphic（原版范式 Plant.cs:470），Comp 持有 GraphicData 列表并惰性解析
-    public class Celes_CompProperties_CrystalCluster : CompProperties
+    public class CelesIM_CompProperties_CrystalCluster : CompProperties
     {
         public List<GraphicData> levelGraphics;
         // dev 直接生成（未走培育器 SpawnCluster/InitGrowth）时的默认参数兜底，XML 可配
@@ -17,17 +17,17 @@ namespace CelesFeature
         // 豁免地板（人工晶态表面/晶化表面）——铺到晶簇脚下不触发地板替换破坏
         public List<TerrainDef> protectedTerrains;
 
-        public Celes_CompProperties_CrystalCluster()
+        public CelesIM_CompProperties_CrystalCluster()
         {
-            compClass = typeof(Celes_CompCrystalCluster);
+            compClass = typeof(CelesIM_CompCrystalCluster);
         }
     }
 
-    public class Celes_CompCrystalCluster : ThingComp
+    public class CelesIM_CompCrystalCluster : ThingComp
     {
         [Unsaved] private List<Graphic> levelGraphicCache;
 
-        public Celes_CompProperties_CrystalCluster Props => (Celes_CompProperties_CrystalCluster)props;
+        public CelesIM_CompProperties_CrystalCluster Props => (CelesIM_CompProperties_CrystalCluster)props;
 
         public Graphic GraphicForLevel(int level)
         {
@@ -49,7 +49,7 @@ namespace CelesFeature
         public override string CompInspectStringExtra()
         {
             string text = base.CompInspectStringExtra();
-            string s = "晶体等级: " + ((parent as Celes_CrystalCluster)?.Level ?? 0);
+            string s = "CelesIM_Keyed_CrystalLevel".Translate((parent as CelesIM_CrystalCluster)?.Level ?? 0);
             return text.NullOrEmpty() ? s : text + "\n" + s;
         }
 
@@ -61,7 +61,7 @@ namespace CelesFeature
             base.PostDestroy(mode, previousMap);
             if (mode != DestroyMode.KillFinalize || previousMap == null)
                 return;
-            Celes_CrystalCluster cluster = parent as Celes_CrystalCluster;
+            CelesIM_CrystalCluster cluster = parent as CelesIM_CrystalCluster;
             if (cluster == null || Props.yieldByLevel == null || Props.yieldByLevel.Count == 0)
                 return;
             int amount = (cluster.Level >= 1 && cluster.Level <= Props.yieldByLevel.Count)
@@ -82,19 +82,19 @@ namespace CelesFeature
             yield return new Command_Action
             {
                 defaultLabel = "DEV: 生长值+1",
-                action = delegate { (parent as Celes_CrystalCluster)?.AddGrowthPoint(1); }
+                action = delegate { (parent as CelesIM_CrystalCluster)?.AddGrowthPoint(1); }
             };
             yield return new Command_Action
             {
                 defaultLabel = "DEV: 立即地板检查",
-                action = delegate { (parent as Celes_CrystalCluster)?.ForceTerrainCheck(); }
+                action = delegate { (parent as CelesIM_CrystalCluster)?.ForceTerrainCheck(); }
             };
         }
     }
 
     // [事实] 基类硬约束：GetFirstMineable 为 is Mineable 类型判断（GridsUtility.cs:362-372），
     // 晶簇必须继承 Mineable 才能进入原版开采系统（Designator_Mine + WorkGiver_Miner 零改动）
-    public class Celes_CrystalCluster : Mineable
+    public class CelesIM_CrystalCluster : Mineable
     {
         private int level = 1;
         private int growthPoints;
@@ -114,7 +114,7 @@ namespace CelesFeature
             base.SpawnSetup(map, respawningAfterLoad);
             if (pointThresholds == null)
             {
-                Celes_CompProperties_CrystalCluster props = def.GetCompProperties<Celes_CompProperties_CrystalCluster>();
+                CelesIM_CompProperties_CrystalCluster props = def.GetCompProperties<CelesIM_CompProperties_CrystalCluster>();
                 if (props != null)
                 {
                     pointThresholds = props.pointToGrow != null ? new List<int>(props.pointToGrow) : null;
@@ -138,7 +138,7 @@ namespace CelesFeature
             else
             {
                 TerrainDef terrain = Map.terrainGrid.TerrainAt(Position);
-                Celes_CompProperties_CrystalCluster props = def.GetCompProperties<Celes_CompProperties_CrystalCluster>();
+                CelesIM_CompProperties_CrystalCluster props = def.GetCompProperties<CelesIM_CompProperties_CrystalCluster>();
                 List<TerrainDef> terrains = terrainDefs;
                 if (terrains == null)
                     terrains = props?.terrainToGrow;
@@ -187,7 +187,7 @@ namespace CelesFeature
         {
             get
             {
-                Graphic graphic = this.TryGetComp<Celes_CompCrystalCluster>()?.GraphicForLevel(level);
+                Graphic graphic = this.TryGetComp<CelesIM_CompCrystalCluster>()?.GraphicForLevel(level);
                 return graphic ?? base.Graphic;
             }
         }

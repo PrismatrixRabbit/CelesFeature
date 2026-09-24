@@ -9,7 +9,7 @@ namespace CelesFeature
     // 状态机（唯一判定）：晶种活性 → 每 expandCheckTicks 扩张 +radiusGrowPerCheck；晶种失活 → 半径冻结（效果持续）
     // [事实] 植物伤害参照原版 DefoliatorShipPart（CompPlantHarmRadius.cs:37-91）：面积频率采样 → 随机点脱叶/击杀
     // [事实] 半径平滑微增量（无每日跳变）；冻结底线 = 晶簇生成判定次数 0/x（晶种失活）
-    public class Celes_CompProperties_CrystalBlight : CompProperties
+    public class CelesIM_CompProperties_CrystalBlight : CompProperties
     {
         public float startRadius = 10.9f;
         public float radiusGrowPerCheck = 0.5f;
@@ -22,28 +22,28 @@ namespace CelesFeature
         public bool ignoreSpecialTrees = true;
         public bool messageOnCropDeath = true;
 
-        public Celes_CompProperties_CrystalBlight()
+        public CelesIM_CompProperties_CrystalBlight()
         {
-            compClass = typeof(Celes_CompCrystalBlight);
+            compClass = typeof(CelesIM_CompCrystalBlight);
         }
     }
 
-    public class Celes_CompCrystalBlight : ThingComp
+    public class CelesIM_CompCrystalBlight : ThingComp
     {
         private float currentRadius;
         private int nextExpandTick;
         private float plantHarmTimer;
 
-        [Unsaved] private Celes_CompCrystalSeed seedComp;
+        [Unsaved] private CelesIM_CompCrystalSeed seedComp;
 
-        public Celes_CompProperties_CrystalBlight Props => (Celes_CompProperties_CrystalBlight)props;
+        public CelesIM_CompProperties_CrystalBlight Props => (CelesIM_CompProperties_CrystalBlight)props;
 
         public float CurrentRadius => currentRadius;
 
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);
-            seedComp = parent.GetComp<Celes_CompCrystalSeed>();
+            seedComp = parent.GetComp<CelesIM_CompCrystalSeed>();
             if (!respawningAfterLoad)
             {
                 currentRadius = Props.startRadius;
@@ -162,8 +162,7 @@ namespace CelesFeature
             string text = base.CompInspectStringExtra();
             // 单位换算为 /天（每判定 +radiusGrowPerCheck，判定周期 expandCheckTicks）：0.5×24 = 12.0/天
             float perDay = Props.radiusGrowPerCheck * (60000f / Props.expandCheckTicks);
-            string s = "枯萎半径: " + currentRadius.ToString("0.0")
-                + " (+" + perDay.ToString("0.0") + "/天)";
+            string s = "CelesIM_Keyed_BlightRadius".Translate(currentRadius.ToString("0.0"), perDay.ToString("0.0"));
             return text.NullOrEmpty() ? s : text + "\n" + s;
         }
 

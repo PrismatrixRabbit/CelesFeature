@@ -5,32 +5,32 @@ using Verse;
 namespace CelesFeature
 {
     // U7 定稿：terrain 筛选（TerrainList）与仅看支撑（Affordance）互斥双模式
-    public enum CrystalTerrainCheckMode
+    public enum CelesIM_CrystalTerrainCheckMode
     {
         TerrainList,
         Affordance
     }
 
-    public class Celes_CompProperties_CrystalSeed : Celes_CompProperties_CrystalGrowth
+    public class CelesIM_CompProperties_CrystalSeed : CelesIM_CompProperties_CrystalGrowth
     {
         public int attemptsLimit = 30;
-        public CrystalTerrainCheckMode terrainCheckMode = CrystalTerrainCheckMode.TerrainList;
+        public CelesIM_CrystalTerrainCheckMode terrainCheckMode = CelesIM_CrystalTerrainCheckMode.TerrainList;
         public GraphicData activeGraphicData;
 
-        public Celes_CompProperties_CrystalSeed()
+        public CelesIM_CompProperties_CrystalSeed()
         {
-            compClass = typeof(Celes_CompCrystalSeed);
+            compClass = typeof(CelesIM_CompCrystalSeed);
         }
     }
 
-    public class Celes_CompCrystalSeed : ThingComp
+    public class CelesIM_CompCrystalSeed : ThingComp
     {
         private int attemptsRemaining;
         private int nextGrowTick;
 
         [Unsaved] private Graphic activeGraphic;
 
-        public Celes_CompProperties_CrystalSeed Props => (Celes_CompProperties_CrystalSeed)props;
+        public CelesIM_CompProperties_CrystalSeed Props => (CelesIM_CompProperties_CrystalSeed)props;
 
         public bool IsActive => attemptsRemaining > 0;
 
@@ -81,9 +81,9 @@ namespace CelesFeature
                 return;
             }
             TerrainAffordanceDef affordance = null;
-            if (Props.terrainCheckMode == CrystalTerrainCheckMode.Affordance)
+            if (Props.terrainCheckMode == CelesIM_CrystalTerrainCheckMode.Affordance)
                 affordance = parent.def.terrainAffordanceNeeded;
-            Celes_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props, CellValidator, affordance);
+            CelesIM_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props, CellValidator, affordance);
         }
 
         private void DirtyMapMesh()
@@ -94,7 +94,7 @@ namespace CelesFeature
 
         private bool CellValidator(IntVec3 cell)
         {
-            if (Props.terrainCheckMode == CrystalTerrainCheckMode.Affordance)
+            if (Props.terrainCheckMode == CelesIM_CrystalTerrainCheckMode.Affordance)
             {
                 // [事实] 复用 def 自带字段 terrainAffordanceNeeded（BuildableDef.cs:52）
                 TerrainAffordanceDef need = parent.def.terrainAffordanceNeeded;
@@ -112,7 +112,7 @@ namespace CelesFeature
             DirtyMapMesh();
         }
 
-        // 选中圈：显示 growRadius 生效范围（类太阳灯，放置 ghost 见 PlaceWorker_CrystalGrowRadius）
+        // 选中圈：显示 growRadius 生效范围（类太阳灯，放置 ghost 见 CelesIM_PlaceWorker_CrystalGrowRadius）
         public override void PostDrawExtraSelectionOverlays()
         {
             GenDraw.DrawRadiusRing(parent.Position, Props.growRadius);
@@ -138,7 +138,8 @@ namespace CelesFeature
         public override string CompInspectStringExtra()
         {
             string text = base.CompInspectStringExtra();
-            string s = "状态: " + (IsActive ? "活性" : "失活");
+            string s = "CelesIM_Keyed_CrystalSeedStatus".Translate(
+                IsActive ? "CelesIM_Keyed_CrystalSeedActive".Translate() : "CelesIM_Keyed_CrystalSeedInactive".Translate());
             if (!text.NullOrEmpty())
                 s = text + "\n" + s;
             // U7b 定稿：剩余次数玩家不可见，dev 可见
@@ -162,7 +163,7 @@ namespace CelesFeature
         {
             get
             {
-                Celes_CompCrystalSeed comp = this.TryGetComp<Celes_CompCrystalSeed>();
+                CelesIM_CompCrystalSeed comp = this.TryGetComp<CelesIM_CompCrystalSeed>();
                 if (comp != null && comp.IsActive && comp.ActiveGraphic != null)
                     return comp.ActiveGraphic;
                 return base.Graphic;

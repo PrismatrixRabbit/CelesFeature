@@ -7,7 +7,7 @@ using Verse.AI;
 namespace CelesFeature
 {
     // [事实] 简化自 JobDriver_Refuel：Reserve 双方 → 搬运 → Wait(240) → 结算（JobDriver_Refuel.cs:30-50）
-    public class Celes_JobDriver_CorpseRefuel : JobDriver
+    public class CelesIM_JobDriver_CorpseRefuel : JobDriver
     {
         private const TargetIndex SeederInd = TargetIndex.A;
         private const TargetIndex CorpseInd = TargetIndex.B;
@@ -40,7 +40,7 @@ namespace CelesFeature
 
         private void FinalizeRefueling()
         {
-            Celes_CompCorpseFuel fuelComp = Seeder.TryGetComp<Celes_CompCorpseFuel>();
+            CelesIM_CompCorpseFuel fuelComp = Seeder.TryGetComp<CelesIM_CompCorpseFuel>();
             CompRefuelable refuelable = Seeder.TryGetComp<CompRefuelable>();
             float amount = fuelComp != null ? fuelComp.GetCorpseFuelAmount(CorpseTarget) : 0f;
             if (amount > 0f)

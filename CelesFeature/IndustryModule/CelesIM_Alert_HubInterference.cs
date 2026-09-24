@@ -4,12 +4,12 @@ using RimWorld;
 
 namespace CelesFeature
 {
-    public class Alert_HubInterference : Alert
+    public class CelesIM_Alert_HubInterference : Alert
     {
-        public Alert_HubInterference()
+        public CelesIM_Alert_HubInterference()
         {
-            defaultLabel = "中枢干扰宕机";
-            defaultExplanation = "地图上存在多个活跃的星铃编译中枢，其频率重叠会导致互相干扰，可能至少有一个因信号干扰而宕机。";
+            defaultLabel = "CelesIM_Keyed_AlertInterferenceLabel".Translate();
+            defaultExplanation = "CelesIM_Keyed_AlertInterferenceDesc".Translate();
             defaultPriority = AlertPriority.Medium;
         }
 
@@ -19,11 +19,12 @@ namespace CelesFeature
             List<Map> maps = Find.Maps;
             for (int i = 0; i < maps.Count; i++)
             {
-                List<Building> buildings = maps[i].listerBuildings.allBuildingsColonist;
-                for (int j = 0; j < buildings.Count; j++)
+                // G 批：数据源 = 管理器注册表——判定语义不变
+                List<CelesIM_CompThreadProducer> hubs = CelesIM_ThreadNetworkManager.For(maps[i]).HubsForReading;
+                for (int j = 0; j < hubs.Count; j++)
                 {
-                    CompThreadProducer producer = buildings[j].TryGetComp<CompThreadProducer>();
-                    if (producer != null && producer.IsShutdownByInterference)
+                    CelesIM_CompThreadProducer producer = hubs[j];
+                    if (producer != null && producer.parent != null && producer.IsShutdownByInterference)
                         culprits.Add(producer.parent);
                 }
             }

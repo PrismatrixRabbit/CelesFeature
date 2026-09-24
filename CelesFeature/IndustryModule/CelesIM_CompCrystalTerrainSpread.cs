@@ -6,7 +6,7 @@ namespace CelesFeature
     // 晶化表面扩散（真菌状分叉 + 间隙填充——参照原版 CompGrowsFleshmassTendrils 的
     // GrowTendril/CreateBranch 分叉模式 + ThickenTendril 填充模式，CompGrowsFleshmassTendrils.cs:164-232）
     // 地板为 layerable terrain：SetTerrain 铺层保留底层（TerrainGrid.cs:216-228），玩家拆除还原原始地形（:280-305）
-    public class Celes_CompProperties_CrystalTerrainSpread : CompProperties
+    public class CelesIM_CompProperties_CrystalTerrainSpread : CompProperties
     {
         public TerrainDef spreadTerrain;              // 感染地板（晶化表面）
         public int spreadPerCheck = 3;                // 每周期扩散操作数（XML 可配）
@@ -16,9 +16,9 @@ namespace CelesFeature
         public float thickenChance = 0.6f;            // 填充概率（B：分叉+间隙填充，参照原版 ThickenTendril 权重）
         public TerrainAffordanceDef neededAffordance; // 可感染支撑（Light——水面无 Light 不感染）
 
-        public Celes_CompProperties_CrystalTerrainSpread()
+        public CelesIM_CompProperties_CrystalTerrainSpread()
         {
-            compClass = typeof(Celes_CompCrystalTerrainSpread);
+            compClass = typeof(CelesIM_CompCrystalTerrainSpread);
         }
     }
 
@@ -37,21 +37,21 @@ namespace CelesFeature
         }
     }
 
-    public class Celes_CompCrystalTerrainSpread : ThingComp
+    public class CelesIM_CompCrystalTerrainSpread : ThingComp
     {
         private const int SpreadCheckTicks = 2500;    // 固定扩散周期（用户裁决：不可配）
 
         private int nextSpreadTick;
         private List<Celes_GrowthTip> tips = new List<Celes_GrowthTip>();
 
-        [Unsaved] private Celes_CompCrystalSeed seedComp;
+        [Unsaved] private CelesIM_CompCrystalSeed seedComp;
 
-        public Celes_CompProperties_CrystalTerrainSpread Props => (Celes_CompProperties_CrystalTerrainSpread)props;
+        public CelesIM_CompProperties_CrystalTerrainSpread Props => (CelesIM_CompProperties_CrystalTerrainSpread)props;
 
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);
-            seedComp = parent.GetComp<Celes_CompCrystalSeed>();
+            seedComp = parent.GetComp<CelesIM_CompCrystalSeed>();
             if (respawningAfterLoad)
                 return;
             // 晶种位置创建感染地板（layerable 铺层——可逆拆除还原原始地形）

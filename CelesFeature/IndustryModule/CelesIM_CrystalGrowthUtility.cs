@@ -6,14 +6,14 @@ using Verse;
 namespace CelesFeature
 {
     // 判定链共享工具：培育器与晶种共用同一生长算法
-    public static class Celes_CrystalGrowthUtility
+    public static class CelesIM_CrystalGrowthUtility
     {
         // 返回本次检测创建晶簇数（DEV 用）
-        public static int DoGrowCheck(Map map, IntVec3 center, Celes_CompProperties_CrystalGrowth props,
+        public static int DoGrowCheck(Map map, IntVec3 center, CelesIM_CompProperties_CrystalGrowth props,
             Func<IntVec3, bool> cellValidator, TerrainAffordanceDef affordanceNeeded)
         {
             // 单次 GenRadial 遍历同时收集：范围内晶簇（削减/生长驱动用）+ 可选生成格
-            List<Celes_CrystalCluster> clusters = new List<Celes_CrystalCluster>();
+            List<CelesIM_CrystalCluster> clusters = new List<CelesIM_CrystalCluster>();
             List<IntVec3> candidates = new List<IntVec3>();
             foreach (IntVec3 cell in GenRadial.RadialCellsAround(center, props.growRadius, true))
             {
@@ -23,7 +23,7 @@ namespace CelesFeature
                 List<Thing> things = map.thingGrid.ThingsListAtFast(cell);
                 for (int i = 0; i < things.Count; i++)
                 {
-                    if (things[i] is Celes_CrystalCluster cluster)
+                    if (things[i] is CelesIM_CrystalCluster cluster)
                     {
                         clusters.Add(cluster);
                         hasCluster = true;
@@ -71,7 +71,7 @@ namespace CelesFeature
             return spawned;
         }
 
-        public static Celes_CrystalCluster SpawnCluster(IntVec3 cell, Map map, Celes_CompProperties_CrystalGrowth props,
+        public static CelesIM_CrystalCluster SpawnCluster(IntVec3 cell, Map map, CelesIM_CompProperties_CrystalGrowth props,
             TerrainAffordanceDef affordanceNeeded)
         {
             // 二次防御：多源同 tick 竞态下格已非空（如另一培育器刚 spawn），放弃避免 wipe 冲突物
@@ -80,7 +80,7 @@ namespace CelesFeature
             // 晶簇位置创建感染地板（layerable 铺层——可逆拆除还原原始地形；不触发地板破坏——protectedTerrains 豁免）
             if (props.spawnTerrain != null)
                 map.terrainGrid.SetTerrain(cell, props.spawnTerrain);
-            Celes_CrystalCluster cluster = (Celes_CrystalCluster)ThingMaker.MakeThing(props.baseGrowDef);
+            CelesIM_CrystalCluster cluster = (CelesIM_CrystalCluster)ThingMaker.MakeThing(props.baseGrowDef);
             cluster.InitGrowth(new List<int>(props.pointToGrow),
                 props.terrainToGrow != null ? new List<TerrainDef>(props.terrainToGrow) : null,
                 affordanceNeeded);

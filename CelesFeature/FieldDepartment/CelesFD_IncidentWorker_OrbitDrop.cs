@@ -8,34 +8,50 @@ using Verse;
 namespace CelesFeature
 {
     // 星铃轨道垃圾箱坠落（嵌套事件 worker——2026-08-15）
+    // ⚠ 2026-09-21：InitialCrystal 连发案挂起中（玩家 8-28 版环境）——完整案卷与待玩家验证项见
+    //   《Rimworld1.6反编译\CelesFD_机制笔记.md》末章；防御已定稿为三层（本文件+XML），static 闸经裁决不落。
     // 内容生成三形态：物品/pawn（星铃空投舱砸开——G1 资产复用，faction 决定外观 DropPodUtility.cs:14 实证）、
     //   建筑（专属下降 def 落地 → r=10 生成容器并填战利品表）
     public class CelesFD_IncidentWorker_OrbitDrop : IncidentWorker
     {
+        // 派系门禁一次性日志标记（入口层已挡叙事者路径；此标记防直调路径每 tick 刷屏）
+        private static bool factionMissingLogged;
+
+        // 派系门禁·入口层（2026-09-20）：派系缺失 → 全部轨道坠落事件不进随机池
+        // （StorytellerComp.UsableIncidentsInCategory 末步即 CanFireNow）、SingleMTB 不产生候选、
+        // TryFire 拒绝——含 forced 派发（CanFireNowSub 调用点在 IncidentWorker.CanFireNow 的 forced 跳过块之外，1.6 实证）
+        protected override bool CanFireNowSub(IncidentParms parms)
+        {
+            return CelesFD_BeaconUtility.BeaconFaction != null;
+        }
+
         protected override bool TryExecuteWorker(IncidentParms parms)
         {
-            // 2026-08-25 开局任务链：初始晶体坠落特化——派系存在前置 + 置位触发时刻（道歉信 3700 起算=事件触发时刻）
+            // 派系门禁·执行体层（2026-09-20，上提自 Initial 分支并扩展至全部事件）：
+            // 兜住绕过 CanFireNow 的直调路径（dev Execute incident / 事件增强类 mod 强制触发）
+            if (CelesFD_BeaconUtility.BeaconFaction == null)
+            {
+                if (!factionMissingLogged)
+                {
+                    factionMissingLogged = true;
+                    Log.Message("[CelesFD] OrbitDrop skipped (beacon faction missing) — orbit drop incidents disabled until faction exists");
+                }
+                return false;
+            }
+
             if (def == CelesFD_DefOf.CelesFD_InitialCrystalOrbitDrop)
             {
-                if (CelesFD_BeaconUtility.BeaconFaction == null)
-                {
-                    Log.Message("[CelesFD] Initial crystal orbit drop skipped (beacon faction missing)");
-                    return false;
-                }
                 CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
-                if (gc != null)
-                {
-                    gc.CrystalEventTriggered = true;
-                    gc.CrystalEventTick = Find.TickManager.TicksGame;
-                }
+                if (gc == null) return false;                               // 任务链载体缺失 → 拒绝（原静默跳过置位仍掉落）
+                if (gc.CrystalEventTriggered) return false;                 // 全局一次闸：forced/直调/多地图/重定居一律挡
+                gc.CrystalEventTriggered = true;
+                gc.CrystalEventTick = Find.TickManager.TicksGame;
             }
 
             Map map = (Map)parms.target;
             CelesFD_OrbitDropExtension ext = def.GetModExtension<CelesFD_OrbitDropExtension>();
             if (ext == null || ext.crates == null || ext.crates.Count == 0) return false;
-
-            // 2026-08-15 用户裁决：集中坠落——一次确定中心（原版 DropThingGroupsNear dropCenter 附近语义），物品/pawn/建筑共用
-            // W-2b（R5 降噪）：逐条目插桩移除（卡舱已根治）——仅保留单条事件摘要
+            
             IntVec3 dropCenter = DropCellFinder.RandomDropSpot(map);
             var things = new List<Thing>();
             int crateCount = 0, thingCrates = 0, buildingCrates = 0;
@@ -55,9 +71,8 @@ namespace CelesFeature
 
             if (things.Count > 0)
                 DropPodUtility.DropThingsNear(dropCenter, map, things,
-                    faction: CelesFD_BeaconUtility.BeaconFaction);   // 星铃空投舱（G1 资产）——同中心集中（DropThingGroupsNear 链）
+                    faction: CelesFD_BeaconUtility.BeaconFaction);
             Log.Message($"[CelesFD] OrbitDrop '{def.defName}': {crateCount} crates ({thingCrates} scatter / {buildingCrates} building), {things.Count} loose things @ {dropCenter}");
-            // 2026-08-15 用户裁决：letter 指向落点（"转至目标地点"+箭头——LookTargets 驱动，原版 ResourcePodCrash.cs:14 同款）
             SendStandardLetter(parms, new LookTargets(new TargetInfo(dropCenter, map)));
             return true;
         }

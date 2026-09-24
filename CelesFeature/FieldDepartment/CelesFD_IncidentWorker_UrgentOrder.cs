@@ -12,6 +12,8 @@ namespace CelesFeature
         protected override bool CanFireNowSub(IncidentParms parms)
         {
             if (CelesFD_GameComponent.Instance == null) return false;
+            // 2026-09-20 派系门禁（同 OrbitDrop 门禁）：无星铃派系 → 不进池/不产生候选
+            if (CelesFD_BeaconUtility.BeaconFaction == null) return false;
             // 2026-08-29 用户需求：突发订单需"破译星铃频段"研究完成后才触发——
             // CanFireNowSub 拦截（原版语义：事件当前不可发生，SingleMTB 下个 interval 自然重试；研究完成（道歉信解锁或自行研究）后自动恢复）
             ResearchProjectDef proj = DefDatabase<ResearchProjectDef>.GetNamedSilentFail(CelesFD_IncidentWorker_Apology.DecryptFreqProjectDefName);
@@ -23,6 +25,7 @@ namespace CelesFeature
         {
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             if (gc == null) return false;
+            if (CelesFD_BeaconUtility.BeaconFaction == null) return false;   // 2026-09-20 直调兜底（绕过 CanFireNow 的路径）
             if (!CelesFD_MarketGenerator.TryGenerateUrgentOrder(gc))
                 return false;   // 上限满/无模板 → 本次不触发（下个 interval 重试）
             SendStandardLetter(parms, LookTargets.Invalid);   // 突发单无地图目标（F3 Relocation :74 同款签名：IncidentParms, LookTargets, params NamedArgument[]）

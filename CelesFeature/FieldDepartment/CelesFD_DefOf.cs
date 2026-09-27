@@ -13,10 +13,6 @@ namespace CelesFeature
         public static JobDef CelesFD_UseAntenna;
         public static ThingDef CelesFD_CargoPod;
         public static LetterDef CelesFD_RelocationOffer;
-        public static CelesFD_TickerDef CelesFD_TickerDefault;
-        public static CelesFD_SubPageDef CelesFD_SubPageWelcome;
-        public static CelesFD_SubPageDef CelesFD_SubPageTrade;
-        public static CelesFD_SubPageDef CelesFD_SubPageLogistics;
         public static CelesFD_UnlockLevelConfigDef CelesFD_UnlockLevelConfigDefault;
 
         public static IncidentDef CelesFD_BeaconRequestSignal;

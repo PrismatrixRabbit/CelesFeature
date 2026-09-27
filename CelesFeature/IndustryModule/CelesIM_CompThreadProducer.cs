@@ -10,13 +10,12 @@ namespace CelesFeature
         public int baseThreadsProduce = 8;
         public float connectRadius = 24.9f;
         public int overloadCount = 7500;
+        // ── 批 3 B3：连线特效（Q3 B：中枢端连点 z+ 偏移——伪 3D 视觉高度，按贴图塔顶实际位置填）──
+        public float linkHeight = 0f;
         // ── E+F：自定义中枢故障（原版 CompBreakdownable 禁用——维修资源 XML 可调，Q-F1(a) 单种多数量）──
         public ThingDef faultRepairResource;   // 维修所需资源（null = 无配置，故障不可修——配置校验用）
         public int faultRepairCount = 1;       // 资源数量
         public int faultRepairWorkTicks = 1000;// 维修工作时长（原版 FixBrokenDownBuilding 同值默认）
-        public string indicatorTexPath = "";
-        public Vector2 indicatorDrawSize = new Vector2(1f, 1f);
-        public float indicatorVerticalOffset = 0f;
         public CelesIM_CompProperties_ThreadProducer()
         {
             compClass = typeof(CelesIM_CompThreadProducer);
@@ -210,10 +209,8 @@ namespace CelesFeature
             base.PostDeSpawn(map, mode);
         }
         // ============================================================
-        //  F9-b: 方向性特效（E10：批 3 删除整段）
+        //  F9-b: 状态脉动特效（E10 方向指示器已删；R-IM1 原版范式脉动）
         // ============================================================
-        [Unsaved] private Material indicatorMat;
-        [Unsaved] private bool indicatorMatTried;
         [Unsaved] private Material overloadMat;
         [Unsaved] private bool overloadMatTried;
         public override void PostDraw()
@@ -230,49 +227,16 @@ namespace CelesFeature
                     }
                     if (overloadMat != null)
                     {
-                        float alpha = Mathf.Lerp(0.35f, 0.95f, Mathf.PingPong(Time.realtimeSinceStartup * 1.0f, 1f));
-                        overloadMat.SetColor("_Color", new Color(1f, 1f, 1f, alpha));
+                        // R-IM1 原版范式（OverlayDrawer.cs:267）：thingIDNumber 相位散列错拍 + FadedMaterialPool 档位池化，共享材质只读零 SetColor
+                        float pulse = (Mathf.Sin((Time.realtimeSinceStartup + 397f * (parent.thingIDNumber % 571)) * 4f) + 1f) * 0.5f;
+                        float alpha = 0.35f + pulse * 0.6f;
                         Vector3 overloadPos = parent.DrawPos;
                         overloadPos.y += 0.3f;
                         Graphics.DrawMesh(MeshPool.plane10,
                             Matrix4x4.TRS(overloadPos, Quaternion.identity, new Vector3(0.8f, 1f, 0.8f)),
-                            overloadMat, 0);
+                            FadedMaterialPool.FadedVersionOf(overloadMat, alpha), 0);
                     }
                 }
-            }
-
-            // ── 方向特效：仅在线时绘制（子级清单走管理器）──
-            if (!IsOnline)
-                return;
-            if (Props.indicatorTexPath.NullOrEmpty())
-                return;
-            List<Thing> children = Mgr?.GetDirectChildren(parent);
-            if (children == null || children.Count == 0)
-                return;
-            if (!indicatorMatTried)
-            {
-                indicatorMat = MaterialPool.MatFrom(Props.indicatorTexPath, ShaderDatabase.Transparent);
-                indicatorMatTried = true;
-            }
-            if (indicatorMat == null)
-                return;
-            Vector3 prodCenter = parent.DrawPos;
-            prodCenter.z += Props.indicatorVerticalOffset;
-            for (int i = 0; i < children.Count; i++)
-            {
-                Thing thing = children[i];
-                if (thing == null)
-                    continue;
-                if (thing.TryGetComp<CelesIM_CompThreadConsumer>() == null && thing.TryGetComp<CelesIM_CompThreadRelay>() == null)
-                    continue;
-                Vector3 consCenter = thing.DrawPos;
-                Vector3 dir = consCenter - prodCenter;
-                dir.y = 0f;
-                float angle = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-                Vector3 scale = new Vector3(Props.indicatorDrawSize.x, 1f, Props.indicatorDrawSize.y);
-                Matrix4x4 matrix = Matrix4x4.TRS(prodCenter,
-                    Quaternion.AngleAxis(angle, Vector3.up), scale);
-                Graphics.DrawMesh(MeshPool.plane10, matrix, indicatorMat, 0);
             }
         }
         // ============================================================
@@ -300,7 +264,6 @@ namespace CelesFeature
                 yield return new Command_Action
                 {
                     defaultLabel = "DEV: 修复中枢故障",
-                    defaultDesc = "立即修复中枢故障（等同维修 Job 成功，走抑制算法事件 2）。",
                     action = delegate { Notify_FaultRepaired(); }
                 };
                 yield return new Command_Action

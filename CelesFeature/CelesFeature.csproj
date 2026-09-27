@@ -163,6 +163,7 @@
         <Compile Include="FieldDepartment\CelesFD_JobDriver_UseAntenna.cs" />
         <Compile Include="FieldDepartment\CelesFD_MarketClassDef.cs" />
         <Compile Include="FieldDepartment\CelesFD_MarketGenerator.cs" />
+        <Compile Include="FieldDepartment\CelesFD_FlavorTextUtility.cs" />
         <Compile Include="FieldDepartment\CelesFD_Order.cs" />
         <Compile Include="FieldDepartment\CelesFD_OrbitDropDefs.cs" />
         <Compile Include="FieldDepartment\CelesFD_OrderArchive.cs" />
@@ -179,8 +180,6 @@
         <Compile Include="FieldDepartment\CelesFD_ScenarioUtility.cs" />
         <Compile Include="FieldDepartment\CelesFD_ShippingUtility.cs" />
         <Compile Include="FieldDepartment\CelesFD_Skyfaller_OrbitCrate.cs" />
-        <Compile Include="FieldDepartment\CelesFD_SubPageDef.cs" />
-        <Compile Include="FieldDepartment\CelesFD_TickerDef.cs" />
         <Compile Include="FieldDepartment\CelesFD_TileSelector.cs" />
         <Compile Include="FieldDepartment\CelesFD_UIConfig.cs" />
         <Compile Include="FieldDepartment\CelesFD_UnlockLevelDef.cs" />
@@ -193,6 +192,7 @@
         <Compile Include="IndustryModule\CelesIM_Alert_HubOverload.cs" />
         <Compile Include="IndustryModule\CelesIM_CompCorpseFuel.cs" />
         <Compile Include="IndustryModule\CelesIM_CompCrystalBlight.cs" />
+        <Compile Include="IndustryModule\CelesIM_CompCargo.cs" />
         <Compile Include="IndustryModule\CelesIM_CompCrystalSeed.cs" />
         <Compile Include="IndustryModule\CelesIM_CompCrystalSeeder.cs" />
         <Compile Include="IndustryModule\CelesIM_CompCrystalTerrainSpread.cs" />
@@ -208,6 +208,11 @@
         <Compile Include="IndustryModule\CelesIM_IThreadNode.cs" />
         <Compile Include="IndustryModule\CelesIM_JobDriver_FixHubFault.cs" />
         <Compile Include="IndustryModule\CelesIM_WorkGiver_FixHubFault.cs" />
+        <Compile Include="IndustryModule\CelesIM_LinkEffectRenderer.cs" />
+        <Compile Include="IndustryModule\CelesIM_Patch_StatExtension.cs" />
+        <Compile Include="IndustryModule\CelesIM_Patch_WorkTableBillsUsable.cs" />
+        <Compile Include="IndustryModule\CelesIM_StatPart_ThreadLink.cs" />
+        <Compile Include="IndustryModule\CelesIM_StatWorker_ThreadLink.cs" />
         <Compile Include="IndustryModule\CelesIM_PlaceWorker_CrystalGrowRadius.cs" />
         <Compile Include="IndustryModule\CelesIM_PlaceWorker_ShowThreadConnection.cs" />
         <Compile Include="IndustryModule\CelesIM_ThreadNetworkManager.cs" />

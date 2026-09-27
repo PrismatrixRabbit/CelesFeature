@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using Verse;
+using Verse.Grammar;
 
 namespace CelesFeature
 {
@@ -25,7 +26,14 @@ namespace CelesFeature
     // 订单项模板：一个 entry = 一份订单的候选抽取项（v4.4：保底每抽样 entry 生成一份独立订单）
     public class CelesFD_MarketEntry
     {
-        public ThingFilter filter;                 // 物品源：原版 ThingFilter 内嵌（thingDefs/categories/stuffCategoriesToAllow/allowedQualities/allowedHitPointsPercents/disallowedThingDefs）
+        public ThingFilter filter;                 // 物品源：原版 ThingFilter 内嵌（thingDefs/categories/allowedQualities/allowedHitPointsPercents/disallowedThingDefs）
+        // 批 2.5（2026-09-24 裁决）：def 级材质白名单——原版 ThingFilter 无此字段，FD-G36 模式镜像扩展；null = 不约束。
+        public List<ThingDef> stuffDefsToAllow;    // 形态 B：材质锁定单（如铁单 [Steel] / 玻璃钢单 [Plasteel]）
+        // 批 2.5 修复（2026-09-24 第二轮）：材质类别约束从 filter 内迁出至 entry 层——
+        //   原版 ThingFilter.ResolveReferences :421-428 会把 stuffCategoriesToAllow 内的全部材质 ThingDef
+        //   SetAllow 进 allowedDefs（污染物品候选集——石质单展开为所有石块 def 而非纯货组，icon/品名错乱+装填放宽）。
+        //   entry 层字段不参与 ResolveReferences，仅由 AssignStuffQuality（生成收窄）与 EntryFilterAllows（匹配检查）消费。
+        public List<RimWorld.StuffCategoryDef> stuffCategoriesToAllow;   // 形态 A：类别宽单（如任意石质 [Stony]；RimWorld 命名空间非 Verse）
         public IntRange thingAmount;               // 需求数量区间（形态轴数量自由填写，v4.5 无四界校验）
         public float thingWeight = 1f;             // 抽取权重（Def 级按 validLevelWeightFactor，entry 级按 thingWeight）
         // 计价（entry 级，分币种共存 / 同类互斥，§3.2）
@@ -57,7 +65,7 @@ namespace CelesFeature
         public List<CelesFD_VarOperationDef> prerequisiteConditions;  // 彩蛋前置判定（复用 VarOperationDef Equal/Gte）
         public float easterEggChance = 1f;      // 彩蛋入池概率（每次刷新独立掷骰；默认 1 = 前置满足必入池（兼容旧 Def）；FD-G35 2026-09-02 用户裁决"小概率出现"）
         public string letterDef;                   // 彩蛋专属 letter DefName（null=默认彩蛋通知）
-        public int orderDurationInQuadrums = 1;    // 履约期限（象，默认 1 象=1 个刷新周期）
+        public float orderDurationInQuadrums = 1;    // 履约期限（象，默认 1 象=1 个刷新周期）
         public bool haveSpecialRequire;
         public int marketSpecialFameRequire;
         public int marketSpecialTradeRequire;
@@ -117,6 +125,29 @@ namespace CelesFeature
                     yield return "entry has both thingPriceCredit and orderTotalPriceCredit (defName=" + defName + ", entry filter=" + (entry.filter != null ? entry.filter.Summary : "null") + ")";
                 if (entry.thingPriceKey.HasValue && entry.orderTotalPriceKey.HasValue)
                     yield return "entry has both thingPriceKey and orderTotalPriceKey (defName=" + defName + ")";
+
+                // description 三态校验（2026-09-25 RULEPACK 接入；FD 小收尾改双段）——
+                //   拦三种错写于加载期：内嵌混排 / 引用缺失包 / 包缺指定根词（防 GrammarResolver 运行期红字）
+                //   双段 {RULEPACK:Pack:Root} 用 ExtractPackAndRoot 拆解；单段回退默认根词（向后兼容）
+                if (!entry.description.NullOrEmpty() && entry.description.Contains(CelesFD_FlavorTextUtility.RulePackPrefix))
+                {
+                    if (!CelesFD_FlavorTextUtility.IsWholeFieldRulePackRef(entry.description))
+                        yield return "description RULEPACK ref must occupy the whole field (defName=" + defName + ")";
+                    else
+                    {
+                        CelesFD_FlavorTextUtility.ExtractPackAndRoot(entry.description, out string pn, out string rk);
+                        RulePackDef rpd = DefDatabase<RulePackDef>.GetNamedSilentFail(pn);
+                        if (rpd == null)
+                            yield return "description references missing RulePackDef '" + pn + "' (defName=" + defName + ")";
+                        else
+                        {
+                            var chk = new GrammarRequest();
+                            chk.Includes.Add(rpd);
+                            if (!chk.HasRule(rk))
+                                yield return "description RulePackDef '" + pn + "' lacks root '" + rk + "' (defName=" + defName + ")";
+                        }
+                    }
+                }
             }
 
             // 计价全空（§3.3）：entry 四计价字段全空 且 fameReward <= 0 → Error

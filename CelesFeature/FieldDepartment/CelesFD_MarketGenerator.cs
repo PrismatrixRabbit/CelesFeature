@@ -105,7 +105,7 @@ namespace CelesFeature
             {
                 CelesFD_UnlockLevelDef def = DefDatabase<CelesFD_UnlockLevelDef>.GetNamedSilentFail(config.unlockLevel[i]);
                 if (def == null) continue;
-                if (i == 0) { gc.UnlockLevelValue = 0; return 0; }
+                if (def.isBase) { gc.UnlockLevelValue = i; return i; }   // 保底等级由 isBase 声明（2026-09-27 接线；原 i==0 索引假设——配套校验见 UnlockLevelConfigDef.ConfigErrors）
                 if (gc.Fame >= def.fameRequire && gc.TradeVolume >= def.tradeRequire)
                 {
                     gc.UnlockLevelValue = i;
@@ -495,14 +495,18 @@ namespace CelesFeature
             if (td == null) return;
             // 材质
             List<ThingDef> allowedStuffs = GenStuff.AllowedStuffsFor(td).ToList();   // def 可用材质（含 stuffCategories）
-            if (entry.filter != null)
+            // 批 2.5 修复（2026-09-24）：类别约束改为读 entry 层字段（原 filter 反射通道废弃——
+            //   ResolveReferences :421 会把 stuffCategoriesToAllow 内材质塞进 allowedDefs 污染物品候选集）
+            if (entry.stuffCategoriesToAllow != null && entry.stuffCategoriesToAllow.Count > 0)
             {
-                var cats = (System.Collections.Generic.List<StuffCategoryDef>)filterStuffCatsField.GetValue(entry.filter);
-                if (cats != null && cats.Count > 0)
-                {
-                    allowedStuffs = allowedStuffs.Where(s => s.stuffProps != null && s.stuffProps.categories != null
-                        && s.stuffProps.categories.Any(c => cats.Contains(c))).ToList();
-                }
+                var cats = entry.stuffCategoriesToAllow;
+                allowedStuffs = allowedStuffs.Where(s => s.stuffProps != null && s.stuffProps.categories != null
+                    && s.stuffProps.categories.Any((RimWorld.StuffCategoryDef c) => cats.Contains(c))).ToList();
+            }
+            // 批 2.5 形态 B：def 级材质白名单收窄（铁/玻璃钢锁定单——与类别通道正交，两者都配时双重收窄）
+            if (entry.stuffDefsToAllow != null && entry.stuffDefsToAllow.Count > 0)
+            {
+                allowedStuffs = allowedStuffs.Where(s => entry.stuffDefsToAllow.Contains(s)).ToList();
             }
             if (allowedStuffs.Count > 0)
                 order.stuffDefName = allowedStuffs.RandomElement().defName;   // filter 空 → 全可用材质随机（必须分配）

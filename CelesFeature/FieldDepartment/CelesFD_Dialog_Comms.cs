@@ -85,7 +85,9 @@ namespace CelesFeature
             Widgets.BeginScrollView(rect.ContractedBy(4f), ref overviewScrollPos, new Rect(0f, 0f, rect.width - 24f, contentH));
             float curY = 8f;
             float textW = rect.width - 32f;
-            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Level".Translate(gc.GetEffectiveLevel()));   // 显示等级 = 有效等级（v4.7）
+            CelesFD_UnlockLevelDef curLvlDef = gc.GetLevelDef(gc.GetEffectiveLevel());
+            string levelText = curLvlDef != null && !curLvlDef.description.NullOrEmpty() ? curLvlDef.description : gc.GetEffectiveLevel().ToString();
+            Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Level".Translate(levelText));   // 显示等级 = 有效等级（v4.7）→ 身份词 description（2026-09-27）
             curY += OverviewLineHeight + 2f;
             Widgets.Label(new Rect(8f, curY, textW, OverviewLineHeight), "CelesFD_Keyed_Fame".Translate(gc.Fame));
             curY += OverviewLineHeight + 2f;
@@ -129,7 +131,7 @@ namespace CelesFeature
                     {
                         int fameNeed = Mathf.Max(0, next.fameRequire - gc.Fame);
                         int tradeNeed = Mathf.Max(0, next.tradeRequire - gc.TradeVolume);
-                        text = "CelesFD_Keyed_NextLevel".Translate(fameNeed, tradeNeed);
+                        text = "CelesFD_Keyed_NextLevel".Translate(next.description.NullOrEmpty() ? next.defName : next.description, fameNeed, tradeNeed);
                     }
                 }
             }

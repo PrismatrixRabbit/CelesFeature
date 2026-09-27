@@ -198,9 +198,10 @@ namespace CelesFeature
             return relay != null && relay.HasPowerNow && IsNodeChainActive(GetRelayParent(node));
         }
 
-        // 终端活跃连接：绑定 ∧ 链路活跃 ∧ 终端有电
+        // 终端活跃连接：绑定 ∧ 链路活跃 ∧ 终端有电；DEV 虚拟连接短路（批 4 终版——绕一切网络判定）
         public bool IsActiveConnection(CelesIM_CompThreadConsumer consumer)
         {
+            if (consumer != null && consumer.devForcedActive) return true;
             if (consumer == null || consumer.parent == null) return false;
             Thing node = GetBoundNode(consumer.parent);
             return node != null && consumer.HasPowerNow && IsNodeChainActive(node);

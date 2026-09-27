@@ -91,9 +91,12 @@ namespace CelesFeature
                         gridRect.y + r * cellSize + offsetY,
                         cellSize, cellSize).ContractedBy(cellPadding);
 
-                    if (index < activeCount)
+                    // 段序裁决（2026-09-23）：黄→嵌套→灰→红（超出容量追加）
+                    // 批 2 修复（超载格渲染为黄）：黄/嵌套段必须以容量槽位（normalPips）为上限截断，
+                    // 占用超出容量的格直接红——对齐原版 used 段内 total 截断（:116-118 同语义）
+                    if (index < activeCount && index < normalPips)
                         Widgets.DrawRectFast(cell, node.PipColor);
-                    else if (index < totalLoad)
+                    else if (index < totalLoad && index < normalPips)
                     {
                         // 无信号段：深灰底 + 内芯节点色缩小（绑定保留·占位非活跃）
                         Widgets.DrawRectFast(cell, PipEmptyColor);

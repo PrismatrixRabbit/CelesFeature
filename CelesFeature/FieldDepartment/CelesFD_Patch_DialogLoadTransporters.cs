@@ -69,7 +69,7 @@ namespace CelesFeature
         }
 
         // 过滤（移除非需求物条目，含 Pawn 类——货运不装人；2026-08-15 升级：filter.Matches 含材质/品质/耐久限定）
-        // + 逐物 clamp + 订单池约束（2026-08-15 用户裁决）
+        // + 通用订单池分配（批 2.5 修复 2026-09-24：替代 per-def 钳制 + EnforceOrderPools 两段——见 AssignOrderPools）
         internal static void FilterAndClamp(List<TransferableOneWay> list, Dictionary<ThingDef, int> wanted)
         {
             for (int i = list.Count - 1; i >= 0; i--)
@@ -77,15 +77,7 @@ namespace CelesFeature
                 Thing t = list[i].AnyThing;
                 if (t == null || !MatchesAnyOrder(t)) list.RemoveAt(i);
             }
-            // 逐物上限（跨订单同物求和——用户边界：两单 2000 素食 → 单物上限 4000）
-            foreach (TransferableOneWay t in list)
-            {
-                if (t.AnyThing != null && wanted.TryGetValue(t.AnyThing.def, out int max)
-                    && t.CountToTransfer > max)
-                    t.AdjustTo(max);   // AdjustTo 走原版 ClampAmount 校验链（CountToTransfer 为 protected set）
-            }
-            // 订单池约束：多候选订单 Σ_{候选物} CountToTransfer ≤ remaining（x+y+z ≤ 总量，跨物品共享池）
-            EnforceOrderPools(list);
+            AssignOrderPools(list);
         }
 
         // 装填匹配校验（2026-08-15 升级）：物品须匹配任一已接取订单的 filter——原版 ThingFilter.Allows(Thing)
@@ -102,37 +94,36 @@ namespace CelesFeature
             return false;
         }
 
-        // 订单池约束（用户裁决 2026-08-15）：类别订单"累计装填 vs 总需求"——
-        //   贪心归属：物品量按包含它的订单（剩余降序）分配；任一物品无订单可收 → 削减到已分配量（列表序）
-        private static void EnforceOrderPools(List<TransferableOneWay> list)
+        // 通用订单池分配（批 2.5 修复 2026-09-24）：每笔装填按 EntryFilterAllows（含材质 def/类别实例级检查）
+        //   找到它能归属的订单，贪心扣池——替代原 per-def wanted 钳制 + EnforceOrderPools 两段。
+        //   修复 bug：同 def 异 stuff 订单（铁单/玻璃钢单共用货组 def）per-def 聚合丢失材质维度 →
+        //   两单共享上限互不消耗可超额装填；现按实例匹配正确分离（玻璃钢只吃玻璃钢单池，钢铁只吃钢铁单池）。
+        //   兼容：单物多单求和 ✓（两单 2000 素食同一 def 同材质 → 同池累计 4000）；
+        //         多候选类别单 ✓（EntryFilterAllows 本身就是类别匹配）；FD-G32 场景 ✓（不匹配的跳过）
+        private static void AssignOrderPools(List<TransferableOneWay> list)
         {
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             if (gc == null) return;
             var orders = gc.MarketOrders
-                .Where(o => o.state == CelesFD_OrderState.Accepted && o.remaining > 0 && o.ThingDefs.Count > 1)
+                .Where(o => o.state == CelesFD_OrderState.Accepted && o.remaining > 0)
                 .OrderByDescending(o => o.remaining).ToList();   // 剩余降序（贪心优先大订单）
             if (orders.Count == 0) return;
-            var assigned = new Dictionary<CelesFD_Order, int>();
-            foreach (CelesFD_Order o in orders) assigned[o] = 0;
+            var pool = new Dictionary<CelesFD_Order, int>();
+            foreach (CelesFD_Order o in orders) pool[o] = o.remaining;
             foreach (TransferableOneWay t in list)
             {
                 if (t.AnyThing == null || t.CountToTransfer <= 0) continue;
-                ThingDef def = t.AnyThing.def;
-                // FD-G32 修复（2026-09-02，测试 a/b 判别定位）：物品不属于任何池订单 → 不受池约束管辖，
-                // 跳过（该类物品已由前段 per-def wanted 钳制正确治理——单物订单跨单求和上限）。
-                // 原实现误入"无订单可收"分支被 AdjustTo(0) 清零：类别单+单物单共存时单物物品全部失效
-                if (!orders.Any(o => o.ThingDefs.Contains(def))) continue;
                 int left = t.CountToTransfer;
                 foreach (CelesFD_Order o in orders)
                 {
-                    if (!o.ThingDefs.Contains(def) || assigned[o] >= o.remaining) continue;
-                    int take = Mathf.Min(left, o.remaining - assigned[o]);
-                    assigned[o] += take;
+                    if (pool[o] <= 0 || !o.EntryFilterAllows(t.AnyThing)) continue;
+                    int take = Mathf.Min(left, pool[o]);
+                    pool[o] -= take;
                     left -= take;
                     if (left <= 0) break;
                 }
                 if (left > 0)
-                    t.AdjustTo(t.CountToTransfer - left);   // 无订单可收 → 削减到已分配总量
+                    t.AdjustTo(t.CountToTransfer - left);   // 吃不下的部分削减（AdjustTo 走原版 ClampAmount 校验链）
             }
         }
     }

@@ -84,7 +84,7 @@ NETWORK TIME SYNC ... OK
         private static readonly string BootLogPart2 = @"
 LOCAL KEY VERIFICATION
 -PINGING LOCAL NETWORK CREDENTIALS...
-CLEARANCE LEVEL: GUEST
+CLEARANCE LEVEL: {CLEARANCE}
 
 LOADING COMMUNICATION PROTOCOLS:
 -LOAD PACKET_HANDLER.BIN... OK
@@ -111,10 +111,10 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         private bool bootTextPinnedToBottom = true;
         private bool dialoguePinnedToBottom = true;
 
-        private CelesFD_TickerDef tickerDef;
+        // FD 小收尾（2026-09-25）：跑马灯改走 RulePack 纯列表——tickerDef 已删除，防重文本对比替代 index
         private readonly List<TickerEntry> tickerEntries = new List<TickerEntry>();
-        private int lastTicker1 = -1;
-        private int lastTicker2 = -1;
+        private string lastTickerText1;
+        private string lastTickerText2;
         private float nextAppendTime;
 
         public string Title => "CelesFD_Keyed_Tab_Welcome".Translate();
@@ -129,7 +129,7 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         {
             if (Find.CurrentMap == null)
             {
-                bootLogFull = BootLogPart1 + "LOCAL TIME: --:--\nCOORDINATES: --\n" + BootLogPart2;
+                bootLogFull = ComposeBootLog("LOCAL TIME: --:--\nCOORDINATES: --\n");
                 return;
             }
 
@@ -148,7 +148,16 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
             string timeLine = $"LOCAL TIME: {hour:00}:{minute:00}, {day:00} {quadrum}, {year}";
             string coordLine = $"COORDINATES: {Mathf.Abs(lat):0.#}°{(lat >= 0 ? "N" : "S")} {Mathf.Abs(lon):0.#}°{(lon >= 0 ? "E" : "W")}";
 
-            bootLogFull = BootLogPart1 + timeLine + "\n" + coordLine + "\n" + BootLogPart2;
+            bootLogFull = ComposeBootLog(timeLine + "\n" + coordLine + "\n");
+        }
+
+        // 等级化适配（2026-09-27）：CLEARANCE LEVEL 行随当前有效等级 title 动态化（L1=GUEST 与旧静态一致；def 缺失回退 GUEST）
+        private static string ComposeBootLog(string timeAndCoord)
+        {
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            CelesFD_UnlockLevelDef lvlDef = gc?.GetLevelDef(gc.GetEffectiveLevel());
+            string clearance = lvlDef != null && !lvlDef.title.NullOrEmpty() ? lvlDef.title : "GUEST";
+            return BootLogPart1 + timeAndCoord + BootLogPart2.Replace("{CLEARANCE}", clearance);
         }
 
         public void Notify_Deactivated()
@@ -164,14 +173,11 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
 
             CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
             if (gc == null) return;
-            CelesFD_SubPageDef newsDef = CelesFD_DefOf.CelesFD_SubPageWelcome;
-            if (newsDef == null || newsDef.newsPool.NullOrEmpty()) return;
 
-            if (gc.CurrentNewsIndex < 0)
-                gc.RefreshNews();   // 懒初始化（读档保留 index，不重随机）
-
-            int idx = Mathf.Clamp(gc.CurrentNewsIndex, 0, newsDef.newsPool.Count - 1);
-            string news = newsDef.newsPool[idx];
+            if (gc.CurrentNewsText.NullOrEmpty())
+                gc.RefreshNews();   // 懒初始化（读档保留已选文本，不重随机）
+            string news = gc.CurrentNewsText;
+            if (news.NullOrEmpty()) return;
 
             Rect inner = rect.ContractedBy(10f);
             Widgets.Label(new Rect(inner.x, inner.y, inner.width, 24f), "CelesFD_Keyed_QuarterlyNews".Translate());
@@ -482,7 +488,6 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
         private void DrawTickerBar(Rect rect, float now)
         {
             Widgets.DrawMenuSection(rect);
-            if (tickerDef == null) return;
             UpdateTickerFlow(rect, now);
         }
 
@@ -510,34 +515,45 @@ CHANNEL OPEN. READY FOR UPLINK.";        // 原文不变
 
         private void AppendTicker(Rect rect, float now, float speed)
         {
-            int idx = PickRandomTicker();
-            string text = tickerDef.welcomeTicker[idx];   // 文本经 defInjected 翻译（见 CelesFD_TickerDef.welcomeTicker）
+            string text = PickRandomTicker();
+            if (text.NullOrEmpty()) return;
             Text.Font = GameFont.Small;
             float width = Text.CalcSize(text).x;
             tickerEntries.Add(new TickerEntry { Text = text, Width = width, EnterTime = now });
             nextAppendTime = now + width / speed + TickerGap;
-            lastTicker2 = lastTicker1;
-            lastTicker1 = idx;
+            lastTickerText2 = lastTickerText1;
+            lastTickerText1 = text;
         }
 
         private void StartTicker(float now)
         {
-            tickerDef = CelesFD_DefOf.CelesFD_TickerDefault;
             tickerEntries.Clear();
-            lastTicker1 = -1;
-            lastTicker2 = -1;
+            lastTickerText1 = null;
+            lastTickerText2 = null;
             nextAppendTime = now;
         }
 
-        private int PickRandomTicker()
+        // 跑马灯随机选（FD 小收尾 2026-09-25：条件 RulePack + 文本对比防重——用户裁决 C# 侧保留）
+        // 走 ResolveConditional（Constants 注入对话变量）——ConstantConstraint 规则按等级/事件状态条件过滤；
+        // 无条件规则作为兜底始终参与候选（原 GetRuleStrings 平铺列表的行为在无条件规则上等价）
+        private string PickRandomTicker()
         {
-            int count = tickerDef.welcomeTicker.Count;
-            if (count <= 0) return 0;
-            if (count <= 2) return Rand.RangeInclusive(0, count - 1);
-            int idx;
-            do { idx = Rand.RangeInclusive(0, count - 1); }
-            while (idx == lastTicker1 || idx == lastTicker2);
-            return idx;
+            CelesFD_GameComponent gc = CelesFD_GameComponent.Instance;
+            var constants = new System.Collections.Generic.Dictionary<string, string>();
+            if (gc != null)
+            {
+                constants["Level"] = gc.GetEffectiveLevel().ToString();
+                constants["ApologyTriggered"] = gc.ApologyTriggered ? "1" : "0";
+            }
+            string pick;
+            int safety = 0;
+            do
+            {
+                pick = CelesFD_FlavorTextUtility.ResolveConditional("CelesFD_WelcomeTexts", "r_welcome_ticker", constants);
+                if (pick.NullOrEmpty()) return null;
+            }
+            while ((pick == lastTickerText1 || pick == lastTickerText2) && ++safety < 10);   // 防重 + 安全上限（候选极少时避免死循环）
+            return pick;
         }
 
         private static GUIStyle GetScaledDownStyle(float scale)

@@ -55,16 +55,32 @@ namespace CelesFeature
         private static readonly System.Reflection.FieldInfo filterStuffCatsField =
             AccessTools.Field(typeof(ThingFilter), "stuffCategoriesToAllow");
 
-        // 装填/结算匹配入口（FD-G36 2026-09-02）：filter.Allows(Thing) + 材质类别实例级补充检查——
-        //   filter 配置了 stuffCategoriesToAllow 且物品带材质时，材质类别须命中其一；无材质物品不受约束
+        // 装填/结算匹配入口（FD-G36 2026-09-02；批 2.5 修复 2026-09-24 全面迁 entry 层）：
+        //   filter.Allows(Thing)（物品级）+ entry 层材质双通道补充检查（实例级）——
+        //   原版 Allows(Thing) 无材质检查段；类别/def 两通道均只约束带材质物品，正交叠加。
+        //   批 2.5 修复：stuffCategoriesToAllow 从 filter 内迁至 entry 层（filter 反射通道废弃——
+        //   ResolveReferences :421 会把类别内材质塞进 allowedDefs 污染物品候选集）
         public bool EntryFilterAllows(Thing thing)
         {
             ThingFilter f = EntryFilter;
             if (f == null || !f.Allows(thing)) return false;
-            var cats = (List<StuffCategoryDef>)filterStuffCatsField.GetValue(f);
-            if (cats == null || cats.Count == 0 || thing.Stuff == null) return true;
-            return thing.Stuff.stuffProps != null && thing.Stuff.stuffProps.categories != null
-                && thing.Stuff.stuffProps.categories.Any(c => cats.Contains(c));
+            if (thing.Stuff != null)
+            {
+                CelesFD_MarketEntry entry = Entry;
+                if (entry != null)
+                {
+                    // 类别通道（形态 A：任意石质等）
+                    if (entry.stuffCategoriesToAllow != null && entry.stuffCategoriesToAllow.Count > 0
+                        && !(thing.Stuff.stuffProps != null && thing.Stuff.stuffProps.categories != null
+                             && thing.Stuff.stuffProps.categories.Any((RimWorld.StuffCategoryDef c) => entry.stuffCategoriesToAllow.Contains(c))))
+                        return false;
+                    // def 通道（形态 B：铁/玻璃钢锁定单）
+                    if (entry.stuffDefsToAllow != null && entry.stuffDefsToAllow.Count > 0
+                        && !entry.stuffDefsToAllow.Contains(thing.Stuff))
+                        return false;
+                }
+            }
+            return true;
         }
 
         // v2 候选集解析（旧档 thingDefName 回退单元素——语义一致）
@@ -232,10 +248,30 @@ namespace CelesFeature
             return BaseThingLabel();
         }
 
+        // 描述懒解析缓存（2026-09-25 RULEPACK 接入）：null = 未解析；"" = 确无描述。
+        //   首次访问时按 desc 三态解析并缓存落盘 → 存档后描述绝对稳定（预解析存字符串裁决，无需 seed）。
+        private string resolvedDescription;
+
         public string ResolveDescription()
         {
+            if (resolvedDescription != null)
+                return resolvedDescription.NullOrEmpty() ? null : resolvedDescription;
             CelesFD_MarketEntry entry = Entry;
-            return entry != null && !entry.description.NullOrEmpty() ? ResolveText(entry.description) : null;
+            string raw = (entry != null && !entry.description.NullOrEmpty()) ? entry.description : null;
+            if (raw == null) { resolvedDescription = ""; return null; }
+            // 三态之③：{RULEPACK:包名} 或 {RULEPACK:包名:根词} 整字段（粒度裁决 2026-09-25：不开内嵌混排）
+            // 双段形态 = 一个 pack 服务多个 entry（FD 小收尾 2026-09-25：根词在 description 内指定，零新字段）
+            if (CelesFD_FlavorTextUtility.IsWholeFieldRulePackRef(raw))
+            {
+                CelesFD_FlavorTextUtility.ExtractPackAndRoot(raw, out string packName, out string rootKeyword);
+                string generated = CelesFD_FlavorTextUtility.ResolveRulePack(packName, rootKeyword);
+                if (generated != null) raw = generated;   // 失败回退：原样输出（对齐未知变量现行为）
+            }
+            // 二次插值 {amount}/{thingLabel}…（此时无 RULEPACK 串；即使混入也走 default→null→原样输出，天然防递归）
+            // ResolveTags：语义标签（如 (*Reward)金黄#dbb40c）→ 底层 <color=#RRGGBBAA>（原版 ColoredText 显式
+            //   预转换模式，先例 CompBiocodable.cs:84 .Resolve()——存缓存前转换，显示层零依赖；无标签文本零成本）
+            resolvedDescription = ResolveText(raw).ResolveTags();
+            return resolvedDescription;
         }
 
         public void ExposeData()
@@ -260,6 +296,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref stuffDefName, "stuffDefName", null);
             Scribe_Values.Look(ref qualityCategory, "qualityCategory", QualityCategory.Normal);
             Scribe_Values.Look(ref qualitySet, "qualitySet", false);
+            Scribe_Values.Look(ref resolvedDescription, "resolvedDescription", null);   // 旧档 null = 首显示时懒解析
         }
     }
 }

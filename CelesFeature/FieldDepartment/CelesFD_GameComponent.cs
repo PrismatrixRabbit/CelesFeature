@@ -63,10 +63,11 @@ namespace CelesFeature
         // 新增字段（类成员区）：
         public List<CelesFD_DialogueEntry> DialogueHistory = new List<CelesFD_DialogueEntry>();
 
-        // M0：本季度要闻 index（-1 = 未初始化懒随机；每象随市场刷新重随机——M2 刷新点挂接 RefreshNews）
-        public int CurrentNewsIndex = -1;
+        // M0→FD 小收尾（2026-09-25）：本季度要闻文本缓存（null = 未初始化懒随机；每象随市场刷新重随机）
+        // 原 int CurrentNewsIndex 改 string 缓存（RulePack 选取后直接存文本——旧档该字段丢弃可接受，下次刷新重选）
+        public string CurrentNewsText;
         [Unsaved]
-        private int lastNewsIndex = -1;   // 防重：上次随机出的要闻 index（运行期，不存档）
+        private string lastNewsText;   // 防重：上次随机出的要闻（运行期，不存档）
 
         // ═══ M2：市场与订单（v4.3 D1 单 List 队列；刷新触发） ═══
         public List<CelesFD_Order> MarketOrders = new List<CelesFD_Order>();   // 单市场队列（category/isBuy 字段过滤；接取=状态翻转）
@@ -79,7 +80,7 @@ namespace CelesFeature
         public int NextAcceptOrderIndex;   // 全局接单序号（§5.7 FIFO 单调递增——防删除订单后 Max 复用破坏序；M6 用）
         // M6-2 A5 违约惩罚（§5.8 定稿）：
         public int PunishmentLevel = 1;    // 三级概率惩罚等级 L ∈ {1,2,3}（倍率 1.0x/2.0x/5.0x；触发后 +1 封顶 3；任意订单成功后重置 1）
-        public int FailCount;              // 违约累计次数（"第二次失败起"概率触发判定）
+        public int FailCount;              // 违约累计次数（"第二次失败起"概率触发判定；任意订单成功后重置——2026-09-24 修复）
         public List<CelesFD_OrderArchiveEntry> OrderArchive = new List<CelesFD_OrderArchiveEntry>();   // 外勤档案（§5.7：超 20 删最旧；M7 物流页历史显示）
         public List<CelesFD_LogisticsOrder> InTransitList = new List<CelesFD_LogisticsOrder>();   // M7 在途物流单（出售物流：到期交付；标准 24h/加急 1h）
         public CelesFD_DialogueEngine DialogueEngine = new CelesFD_DialogueEngine();
@@ -121,7 +122,7 @@ namespace CelesFeature
             Scribe_Values.Look(ref RelocationAsked, "CFD_RelocationAsked", false);
             Scribe_Values.Look(ref BeaconCooldownStartTick, "CFD_BeaconCooldownStartTick", -1);
             Scribe_Collections.Look(ref DialogueHistory, "CFD_DialogueHistory", LookMode.Deep);
-            Scribe_Values.Look(ref CurrentNewsIndex, "CFD_CurrentNewsIndex", -1);
+            Scribe_Values.Look(ref CurrentNewsText, "CFD_CurrentNewsText", null);
             Scribe_Collections.Look(ref MarketOrders, "CFD_MarketOrders", LookMode.Deep);
             Scribe_Values.Look(ref LastMarketRefreshTick, "CFD_LastMarketRefreshTick", -1L);
             Scribe_Values.Look(ref ManualRefreshCount, "CFD_ManualRefreshCount", 0);
@@ -581,6 +582,7 @@ namespace CelesFeature
             // 判定结构全部在树 XML（RPN：Not/And/Or 引擎内求值，2026-08-25）——此处仅同步状态变量
             engine.SetVariable("Level", GetEffectiveLevel());
             engine.SetStringVariable("playerFactionName", Faction.OfPlayer?.Name);   // 主树问候插值（无派系 → null 移除）
+            engine.SetStringVariable("playerLevelWord", GetLevelDef(GetEffectiveLevel())?.description);   // 问候身份词插值（等级化适配 2026-09-27——与 Level 变量同源 EffectiveLevel；def 缺失 → null 移除）
             var beacon = CelesFD_BeaconUtility.BeaconFaction;
             float relation = 0f;   // 0 敌 / 1 中 / 2 盟
             if (beacon != null)
@@ -851,9 +853,17 @@ namespace CelesFeature
         public int GetEffectiveLevel()
         {
             int level = UnlockLevelValue;
-            if (Credit < -2000) return 0;                       // 大额欠款：直降 0 级（§5.1）
+            if (Credit < -1000) return 0;                       // 大额欠款：直降 0 级（§5.1）
             if (Credit < 0) level = Math.Max(0, level - 2);     // 欠款：降 2 级至 0
             return level;
+        }
+
+        // 等级索引 → def（config → defName → def；越界/解析失败返回 null，调用方自行回退）——等级化 UI 适配（2026-09-27）
+        public CelesFD_UnlockLevelDef GetLevelDef(int index)
+        {
+            CelesFD_UnlockLevelConfigDef config = CelesFD_DefOf.CelesFD_UnlockLevelConfigDefault;
+            if (config == null || config.unlockLevel == null || index < 0 || index >= config.unlockLevel.Count) return null;
+            return DefDatabase<CelesFD_UnlockLevelDef>.GetNamedSilentFail(config.unlockLevel[index]);
         }
 
         // 首次升级蓝信（§5.3）：LevelCap 提升 → 该等级及更低去除未获取标签 + 蓝信；AcquiredLevels 存档持久化
@@ -867,10 +877,18 @@ namespace CelesFeature
             int maxAcquired = AcquiredLevels.Count == 0 ? -1 : AcquiredLevels.Max();
             if (level <= maxAcquired) return;
             for (int i = 0; i <= level; i++) AcquiredLevels.Add(i);
-            Find.LetterStack.ReceiveLetter(
-                "CelesFD_Keyed_LevelUpTitle".Translate(),
-                "CelesFD_Keyed_LevelUpDesc".Translate(level + 1),
-                LetterDefOf.NeutralEvent);
+            // 等级化适配（2026-09-27）：升级信 def 驱动——sendLevelUpMessage 静音开关 + title/desc（空回退旧 Keyed；仅第一次发送的设计不变）
+            CelesFD_UnlockLevelDef lvlDef = GetLevelDef(level);
+            if (lvlDef == null || !lvlDef.sendLevelUpMessage)
+            {
+                Log.Message($"[CelesFD] Level {level} acquired (first time, letter off)");
+                return;
+            }
+            TaggedString letterTitle = lvlDef.levelUpMessageTitle.NullOrEmpty()
+                ? "CelesFD_Keyed_LevelUpTitle".Translate() : lvlDef.levelUpMessageTitle;
+            TaggedString letterText = lvlDef.levelUpMessageDesc.NullOrEmpty()
+                ? "CelesFD_Keyed_LevelUpDesc".Translate(level + 1) : lvlDef.levelUpMessageDesc;
+            Find.LetterStack.ReceiveLetter(letterTitle, letterText, LetterDefOf.NeutralEvent);
             Log.Message($"[CelesFD] Level {level} acquired (first time)");
         }
 
@@ -880,9 +898,10 @@ namespace CelesFeature
             if (order == null || order.state != CelesFD_OrderState.Available) return false;
             if (MarketOrders.Count(o => o.state == CelesFD_OrderState.Accepted) >= GetMaxTradeOrder()) return false;
             CelesFD_MarketClassDef def = order.TemplateDef;
-            int quadrums = def != null && def.orderDurationInQuadrums > 0 ? def.orderDurationInQuadrums : 1;
+            // 期限（象，float 支持 0.5 半象——2026-09-24；1 象 = 900,000 ticks）：全程 float 运算最后落 ticks，禁 int 截断（0.5→0 = 接单即逾期）
+            float quadrumsF = (def != null && def.orderDurationInQuadrums > 0f) ? def.orderDurationInQuadrums : 1f;
             order.state = CelesFD_OrderState.Accepted;
-            order.deadlineTick = Find.TickManager.TicksGame + quadrums * 900000L;
+            order.deadlineTick = Find.TickManager.TicksGame + (long)(quadrumsF * 900000f);
             order.acceptOrderIndex = NextAcceptOrderIndex;
             NextAcceptOrderIndex++;
             return true;
@@ -1034,8 +1053,9 @@ namespace CelesFeature
             if (FailCount >= 2 && Rand.Chance(0.5f))
             {
                 int lvl = PunishmentLevel;   // 触发时等级（letter 显示）
-                int extraFame = Mathf.RoundToInt(famePenalty * lvl);
-                int extraCredit = Mathf.RoundToInt(creditPenalty * lvl);
+                float lvlMult = ExtraPunishmentMultiplier(lvl);   // L 为阶梯序号，倍率查表（修复 2026-09-24：原 ×lvl 为 1/2/3，意图 1.0/2.0/5.0）
+                int extraFame = Mathf.RoundToInt(famePenalty * lvlMult);
+                int extraCredit = Mathf.RoundToInt(creditPenalty * lvlMult);
                 ModifyFame(-extraFame);
                 ModifyCredit(-extraCredit);
                 PunishmentLevel = Mathf.Min(3, PunishmentLevel + 1);
@@ -1066,6 +1086,14 @@ namespace CelesFeature
             }
         }
 
+        // A5 三级概率惩罚倍率（§5.8 定稿：L1=1.0x / L2=2.0x / L3=5.0x——L 为阶梯序号非倍率本身；修复 2026-09-24）
+        private static float ExtraPunishmentMultiplier(int lvl)
+        {
+            if (lvl <= 1) return 1.0f;
+            if (lvl == 2) return 2.0f;
+            return 5.0f;   // L3 封顶档
+        }
+
         // 外勤档案收纳（§5.7：超 20 条删最旧；M7 物流页历史卡片显示）
         // 2026-08-15：完整信息快照（历史卡片"类同交易页"渲染；absTick = 完成时间"年.象.日"）
         // 类别模式（用户裁决）：名称 = categories 类别名（ResolveLabel 既有逻辑）、icon = 字母序首物（FirstThingDef）——成功/违约统一复用
@@ -1079,10 +1107,11 @@ namespace CelesFeature
                 OrderArchive.RemoveRange(0, OrderArchive.Count - 20);
         }
 
-        // 订单成功结算（M6-5 结算端调用）：A5 L 重置为 1（§5.8）+ 归档
+        // 订单成功结算（M6-5 结算端调用）：A5 L 重置为 1 + FailCount 清零（§5.8；修复 2026-09-24：原漏重置 FailCount）+ 归档
         public void NotifyOrderSucceeded(CelesFD_Order order)
         {
             PunishmentLevel = 1;
+            FailCount = 0;   // 任意订单成功重置违约计数（用户意图 2026-09-24；旧档带入值自此自愈）
             ArchiveAdd(order, success: true);
         }
 
@@ -1102,19 +1131,18 @@ namespace CelesFeature
         public void ModifyTradeVolume(int delta) => TradeVolume += delta;
         public void ModifyQuantumKey(int delta) => QuantumKey += delta;
 
-        // 随机选取本季度要闻（防重仿欢迎页 PickRandomTicker：池≥2 排除上一条；M2 每象刷新点调用同一方法）
+        // 随机选取本季度要闻（FD 小收尾 2026-09-25：走 RulePack 纯列表——池≥2 排除上一条；M2 每象刷新点调用）
         public void RefreshNews()
         {
-            CelesFD_SubPageDef def = CelesFD_DefOf.CelesFD_SubPageWelcome;
-            int count = def?.newsPool?.Count ?? 0;
-            if (count <= 0) { CurrentNewsIndex = -1; return; }
-            if (count == 1) { CurrentNewsIndex = 0; lastNewsIndex = 0; return; }
-            int idx;
-            do { idx = Rand.RangeInclusive(0, count - 1); }
-            while (idx == lastNewsIndex);
-            CurrentNewsIndex = idx;
-            lastNewsIndex = idx;
-            Log.Message("[CelesFD] News refreshed -> index " + idx + " (" + def.newsPool[idx] + ")");
+            var pool = CelesFD_FlavorTextUtility.GetRuleStrings("CelesFD_WelcomeTexts", "r_welcome_news");
+            if (pool.NullOrEmpty()) { CurrentNewsText = null; return; }
+            if (pool.Count == 1) { CurrentNewsText = pool[0]; lastNewsText = pool[0]; return; }
+            string pick;
+            do { pick = pool.RandomElement(); }
+            while (pick == lastNewsText);
+            CurrentNewsText = pick;
+            lastNewsText = pick;
+            Log.Message("[CelesFD] News refreshed -> " + pick);
         }
 
         // ═══ W-1：支援系统（§2.3 三态模型；审批延迟到期转可用；人员侧 R 系列扩展） ═══

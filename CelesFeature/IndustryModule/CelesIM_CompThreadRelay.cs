@@ -12,14 +12,13 @@ namespace CelesFeature
         public float connectRadius = 7.9f;
         public bool defaultAccessible = true;
 
-        // indicator 六参数：批 3 视觉批随方向指示器一并删除（E10）
-        public string indicatorTexPath = "";
-        public Vector2 indicatorDrawSize = new Vector2(1f, 1f);
-        public float indicatorVerticalOffset = 0f;
-
-        public string childIndicatorTexPath = "";
-        public Vector2 childIndicatorDrawSize = new Vector2(0.6f, 0.6f);
-        public float childIndicatorVerticalOffset = 0f;
+        // ── 批 3 B3：常显连线特效（数值占位实测定稿——XML 可调，不写则用默认）──
+        public float linkHeight = 0f;                                   // Q3 B：本端连点 z+ 偏移（伪 3D 视觉高度；中枢~5/中继~1.2）
+        public float lineWidth = 0.12f;                                 // Q2：线宽（世界单位；0.35 实测过宽缩 2/3）
+        public Color lineColorActive = new Color(0.4f, 0.7f, 1f);       // 上行有效 = 淡蓝
+        public Color lineColorBroken = new Color(1f, 0.25f, 0.2f);      // 链路不通 = 红
+        [Unsaved] internal Material LinkMatActive;                      // def 级材质缓存（惰性，渲染线程）
+        [Unsaved] internal Material LinkMatBroken;
 
         public CelesIM_CompProperties_ThreadRelay()
         {
@@ -37,13 +36,9 @@ namespace CelesFeature
         // ── 本机持久状态（上行绑定经管理器）──
         private bool accessibleMode = true;
 
-        // ── 运行期缓存 ──
+        // ── 运行期缓存（脉动材质存共享引用，绘制走 FadedMaterialPool 池化——R-IM1 原版范式）──
         [Unsaved] private CompPowerTrader powerComp;
         [Unsaved] private int devConnectionOffset;
-        [Unsaved] private Material indicatorMat;
-        [Unsaved] private bool indicatorMatTried;
-        [Unsaved] private Material childIndicatorMat;
-        [Unsaved] private bool childIndicatorMatTried;
         [Unsaved] private Material lackMat;
         [Unsaved] private bool lackMatTried;
         [Unsaved] private Material overloadMat;
@@ -168,7 +163,7 @@ namespace CelesFeature
         }
 
         // ============================================================
-        //  特效渲染（优先级 断电>断连>过载 永不叠加——方向指示器批 3 删除）
+        //  特效渲染（优先级 断电>断连>过载 永不叠加；E10 方向指示器已删；R-IM1 原版范式脉动）
         // ============================================================
         public override void PostDraw()
         {
@@ -183,13 +178,14 @@ namespace CelesFeature
                     }
                     if (lackMat != null)
                     {
-                        float alpha = Mathf.Lerp(0.35f, 0.95f, Mathf.PingPong(Time.realtimeSinceStartup * 1.0f, 1f));
-                        lackMat.SetColor("_Color", new Color(1f, 1f, 1f, alpha));
+                        // R-IM1 原版范式（OverlayDrawer.cs:267）：thingIDNumber 相位散列错拍 + FadedMaterialPool 档位池化，共享材质只读零 SetColor
+                        float pulse = (Mathf.Sin((Time.realtimeSinceStartup + 397f * (parent.thingIDNumber % 571)) * 4f) + 1f) * 0.5f;
+                        float alpha = 0.35f + pulse * 0.6f;
                         Vector3 blinkPos = parent.DrawPos;
                         blinkPos.y += 0.3f;
                         Graphics.DrawMesh(MeshPool.plane10,
                             Matrix4x4.TRS(blinkPos, Quaternion.identity, new Vector3(0.6f, 1f, 0.6f)),
-                            lackMat, 0);
+                            FadedMaterialPool.FadedVersionOf(lackMat, alpha), 0);
                     }
                 }
                 else if (CurrentLoad > TotalCapacity)
@@ -201,72 +197,20 @@ namespace CelesFeature
                     }
                     if (overloadMat != null)
                     {
-                        float alpha = Mathf.Lerp(0.35f, 0.95f, Mathf.PingPong(Time.realtimeSinceStartup * 1.0f, 1f));
-                        overloadMat.SetColor("_Color", new Color(1f, 1f, 1f, alpha));
+                        // R-IM1 原版范式（OverlayDrawer.cs:267）：thingIDNumber 相位散列错拍 + FadedMaterialPool 档位池化，共享材质只读零 SetColor
+                        float pulse = (Mathf.Sin((Time.realtimeSinceStartup + 397f * (parent.thingIDNumber % 571)) * 4f) + 1f) * 0.5f;
+                        float alpha = 0.35f + pulse * 0.6f;
                         Vector3 blinkPos = parent.DrawPos;
                         blinkPos.y += 0.3f;
                         Graphics.DrawMesh(MeshPool.plane10,
                             Matrix4x4.TRS(blinkPos, Quaternion.identity, new Vector3(0.8f, 1f, 0.8f)),
-                            overloadMat, 0);
+                            FadedMaterialPool.FadedVersionOf(overloadMat, alpha), 0);
                     }
                 }
             }
 
-            // ── 方向指示器（E10：批 3 删除整段）──
-            List<Thing> children = Mgr?.GetDirectChildren(parent);
-            Thing parentNode = Mgr?.GetRelayParent(parent);
-            if (parentNode == null && (children == null || children.Count == 0))
-                return;
-
-            Vector3 baseCenter = parent.DrawPos;
-
-            if (parentNode != null && !Props.indicatorTexPath.NullOrEmpty())
-            {
-                if (!indicatorMatTried)
-                {
-                    indicatorMat = MaterialPool.MatFrom(Props.indicatorTexPath, ShaderDatabase.Transparent);
-                    indicatorMatTried = true;
-                }
-                if (indicatorMat != null)
-                {
-                    Vector3 pos = baseCenter;
-                    pos.z += Props.indicatorVerticalOffset;
-                    Vector3 dir = parentNode.DrawPos - pos;
-                    dir.y = 0f;
-                    float angle = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-                    Graphics.DrawMesh(MeshPool.plane10,
-                        Matrix4x4.TRS(pos, Quaternion.AngleAxis(angle, Vector3.up),
-                            new Vector3(Props.indicatorDrawSize.x, 1f, Props.indicatorDrawSize.y)),
-                        indicatorMat, 0);
-                }
-            }
-
-            if (children != null && !Props.childIndicatorTexPath.NullOrEmpty())
-            {
-                if (!childIndicatorMatTried)
-                {
-                    childIndicatorMat = MaterialPool.MatFrom(Props.childIndicatorTexPath, ShaderDatabase.Transparent);
-                    childIndicatorMatTried = true;
-                }
-                if (childIndicatorMat != null)
-                {
-                    Vector3 pos = baseCenter;
-                    pos.z += Props.childIndicatorVerticalOffset;
-                    for (int i = 0; i < children.Count; i++)
-                    {
-                        Thing child = children[i];
-                        if (child == null)
-                            continue;
-                        Vector3 dir = child.DrawPos - pos;
-                        dir.y = 0f;
-                        float angle = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-                        Graphics.DrawMesh(MeshPool.plane10,
-                            Matrix4x4.TRS(pos, Quaternion.AngleAxis(angle, Vector3.up),
-                                new Vector3(Props.childIndicatorDrawSize.x, 1f, Props.childIndicatorDrawSize.y)),
-                            childIndicatorMat, 0);
-                    }
-                }
-            }
+            // ── 批 3 B3：常显连线特效（实体层自画，Relay→父级恰一条；守卫外——断电中继画红线）──
+            CelesIM_LinkEffectRenderer.DrawLink(this, Mgr);
         }
 
         public override void PostDrawExtraSelectionOverlays()

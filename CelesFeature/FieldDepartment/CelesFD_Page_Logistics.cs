@@ -226,19 +226,8 @@ namespace CelesFeature
             {
                 Settlement s = stations[0];
                 string status = "CelesFD_Keyed_LogisticsStatusGood".Translate();
-                string template = CelesFD_DefOf.CelesFD_SubPageLogistics?.logisticsTemplate;
-                if (template.NullOrEmpty())
-                {
-                    body = "CelesFD_Keyed_LogisticsDefault".Translate(s.Label, CelesFD_BeaconUtility.FormatStationDescription(s), status);
-                }
-                else
-                {
-                    // M0 占位符替换（\n 转真实换行）；M5d 统一换 ResolveNodeText 插值引擎
-                    body = template.Replace("\\n", "\n")
-                                   .Replace("{station}", s.Label)
-                                   .Replace("{position}", CelesFD_BeaconUtility.FormatStationDescription(s))
-                                   .Replace("{status}", status);
-                }
+                // FD 小收尾（2026-09-25）：SubPageDef.logisticsTemplate 删除——Keyed 路径全功能等价（原可选模板层冗余）
+                body = "CelesFD_Keyed_LogisticsDefault".Translate(s.Label, CelesFD_BeaconUtility.FormatStationDescription(s), status);
             }
 
             Rect textRect = new Rect(inner.x, inner.y + 26f, inner.width, inner.height - 26f);

@@ -9,12 +9,32 @@ namespace CelesFeature
     public class CelesIM_CompProperties_ThreadConsumer : CompProperties
     {
         public int baseThreadsCost = 4;
-        public float produceEffic = 1.0f;
-        public bool canWorkOffline = true;
-        public float offlineFactor = 0.5f;
         public bool haveWarmUpCount = false;
         public int warmUpTicks = 12500;
+        // ── 批 4 终版（数值链重构 2026-09-26）：canWorkOffline→stat Celes_ThreadDependency；
+        // offlineFactor→stat Celes_UnconnectedEfficiency（依赖型 default 0.1=预热起点，可离网型 statBases 配值）；
+        // produceEfic 废弃（建筑倍速走原版 WorkTableWorkSpeedFactor 的 statBases）
+        // 每 tick 冷却的预热进度（float 速率）。小数点不精确：≥1 截断取整为每 tick 流失 N；
+        // (0,1) 倒数取整为每 ~1/rate tick 流失 1（0.5→每 2 tick 流失 1）；0=禁用渐降；负值 ConfigErrors 修复为默认
+        public float warmUpDecayPerTick = 0.5f;
+
+        public override IEnumerable<string> ConfigErrors(ThingDef parentDef)
+        {
+            foreach (string e in base.ConfigErrors(parentDef))
+                yield return e;
+            if (warmUpDecayPerTick < 0f)
+            {
+                yield return "[CelesIM] warmUpDecayPerTick 不能为负——已取默认 0.5（def: " + parentDef?.defName + "）";
+                warmUpDecayPerTick = 0.5f;
+            }
+        }
         public string overclockTech = "";
+        // ── 批 3 B3：连接状态标志（markTexPath 空 = 不启用；无绑定不显示；绑定+活跃=蓝/链不通=红）──
+        public string markTexPath = "";                              // 标志贴图路径（XML 可配，不写死）
+        public float linkHeight = 0f;                                // 标志 z+ 偏移（伪 3D 视觉高度）
+        public float markDrawSize = 1.2f;                            // 标志显示尺寸（格）
+        public Color markColorActive = new Color(0.4f, 0.7f, 1f);    // 蓝（与连线 lineColorActive 同值）
+        public Color markColorBroken = new Color(1f, 0.25f, 0.2f);   // 红（与连线 lineColorBroken 同值）
         public CelesIM_CompProperties_ThreadConsumer()
         {
             compClass = typeof(CelesIM_CompThreadConsumer);
@@ -37,11 +57,14 @@ namespace CelesFeature
 
         // ── 运行期缓存 ──
         [Unsaved] private CompPowerTrader powerComp;
+        // DEV 虚拟连接态（批 4 终版裁决 2026-09-26）：视作连接到「DEV中枢」——绕过一切网络判定
+        //（链路/电力/容量/范围）；Manager.IsActiveConnection 首行短路全链传导；真实绑定成功自动解除
+        [Unsaved] internal bool devForcedActive;
 
         // ── 公开访问器（管理器/渲染/派生态查询）──
         public int ThreadCost => Props.baseThreadsCost;
         public bool HasPowerNow => powerComp?.PowerOn ?? true;
-        public bool IsWarmingUp => warmUpRemaining > 0;
+        public bool IsWarmingUp => Props.haveWarmUpCount && warmUpRemaining > 0;
 
         private CelesIM_ThreadNetworkManager Mgr =>
             parent == null || parent.Map == null ? null : CelesIM_ThreadNetworkManager.For(parent.Map);
@@ -53,9 +76,21 @@ namespace CelesFeature
         // 「无信号」派生（绑定保留·链路不通）——保留旧属性名供既有读取方（Q7 公开面保持）
         public bool IsStandby => IsConnected && !IsActiveConnection;
 
+        // 批 4 终版（单式统一 2026-09-26）：效率=floor + (1−floor) × 热度——全态单一公式
+        // （预热爬升/完成满效/未连接按余温/冷透钉底/无信号冷却滑落自然回归 floor，无满效无信号）；
+        // 唯一起点源=stat Celes_UnconnectedEfficiency（依赖型 default 0.1，可离网型 statBases 配值）
+        public float EfficiencyFloor => parent.GetStatValue(CelesIM_DefOf.Celes_UnconnectedEfficiency);
+
+        public float WarmUpFactor => IsWarmingUp
+            ? EfficiencyFloor + (1f - EfficiencyFloor) * (1f - (float)warmUpRemaining / Props.warmUpTicks)
+            : 1f;
+
+        // 批 4（E5·B' 终案）：效率因子单一真相源=尘构机效率 stat 的 parts 乘法链——
+        // 本方法转发 GetStatValue（postfix/Inspect/效率系数分解行 全部消费方经此单出口，公式零重复）；
+        // 无循环依赖：Celes_ThreadLinkEfficiency 的计算链（produceEffic 基础值→两 part 乘）不触及本 stat
         public float GetWorkSpeedFactor()
         {
-            return 1.0f;   // 批 4 接入效率因子（E5）
+            return parent.GetStatValue(CelesIM_DefOf.Celes_ThreadLinkEfficiency);
         }
 
         // ============================================================
@@ -64,26 +99,42 @@ namespace CelesFeature
         public void OnProducerLost()
         {
             Mgr?.UnbindConsumer(this);
-            warmUpRemaining = 0;
+            // 渐降：不清零——解绑后进度自然进入冷却态（TickWarmup 流失分支）
             TryConnect();
         }
 
-        // F 批：超载级联断路径（管理器 SeverSubtree 调用）——解绑 + 预热清零，**无重试**
+        // F 批：超载级联断路径（管理器 SeverSubtree 调用）——解绑 + 预热冷透（写满值，Q5 强制冷却），**无重试**
         //（与 OnProducerLost 的迁移重试分立，Q5 终版）
         public void SeverFromNetwork()
         {
             Mgr?.UnbindConsumer(this);
-            warmUpRemaining = 0;
+            warmUpRemaining = Props.warmUpTicks;
         }
 
         // ============================================================
-        //  批 2：预热递减（ECS——管理器 MapComponentTick 统一调度）
-        //  三态裁决：递减 ⟺ 活跃连接（与生产无关）；无信号=冻结；断联清零由 Sever/Disconnect 覆盖
+        //  批 2 → 批 4 终版：预热调度（ECS——管理器 MapComponentTick 统一）
+        //  两态（Q4「无信号冻结」改判 2026-09-26）：活跃连接=加热；其余一切（未连接+无信号）=冷却——
+        //  无信号随冷却滑落自然回归 floor，不存在满效无信号
         // ============================================================
         internal void TickWarmup()
         {
-            if (warmUpRemaining > 0 && Mgr != null && Mgr.IsActiveConnection(this))
-                warmUpRemaining--;
+            if (!Props.haveWarmUpCount)
+                return;
+            if (Mgr != null && Mgr.IsActiveConnection(this))
+            {
+                if (warmUpRemaining > 0)
+                    warmUpRemaining--;                                   // 加热：剩余时间递减
+            }
+            else if (!IsConnected && warmUpRemaining < Props.warmUpTicks)
+            {
+                // 冷却（仅未连接——无信号=冻结，裁决 2026-09-26 复位：绑定保留态进度不增不减）：
+                // 速率双档换算（小数不精确——见 Props.warmUpDecayPerTick 注释；无状态直算）
+                float rate = Props.warmUpDecayPerTick;
+                if (rate >= 1f)
+                    warmUpRemaining = Mathf.Min(Props.warmUpTicks, warmUpRemaining + (int)rate);
+                else if (rate > 0f && Find.TickManager.TicksGame % Mathf.Max(1, Mathf.RoundToInt(1f / rate)) == 0)
+                    warmUpRemaining = Mathf.Min(Props.warmUpTicks, warmUpRemaining + 1);
+            }
         }
 
         // ============================================================
@@ -103,14 +154,16 @@ namespace CelesFeature
             if (candidates.Count == 0)
                 return;
             mgr.BindConsumer(this, candidates[0]);
-            if (Props.haveWarmUpCount)
-                warmUpRemaining = Props.warmUpTicks;
+            devForcedActive = false;   // 真实绑定接管虚拟态（直改+让位）
+            // 渐降 v3：绑定不写 remaining——重连从当前冷热程度继续加热（首连冷态来自 PostSpawnSetup 出厂满值）
         }
 
         public void Disconnect()
         {
+            devForcedActive = false;   // DEV 虚拟态随断开解除
+            // 渐降 v3.1：解绑不动 remaining（一切断开路径统一冷却渐降——S2 遗忘语义作废；
+            // 唯一强制冷却=Q5 超载级联走 SeverFromNetwork）
             Mgr?.UnbindConsumer(this);
-            warmUpRemaining = 0;
         }
 
         public void ResetConnection()
@@ -140,7 +193,8 @@ namespace CelesFeature
                     if (wantSwitchOn)
                         TryConnect();
                     else
-                        Disconnect();   // 解绑+预热清零（绑定遗忘）
+                        Disconnect();   // 渐降 v3.1（裁决变更 2026-09-26）：toggle off 不再遗忘直清——
+                                        // 与重置/拆除同待遇（冷却渐降，S2 遗忘语义作废；Q5 超载强制冷却保留）
                 }
             };
             yield return new Command_Action
@@ -167,13 +221,30 @@ namespace CelesFeature
                 yield return new Command_Action
                 {
                     defaultLabel = "DEV: 视作已连接",
-                    defaultDesc = "复位手动断开守卫并立即尝试连接。不绕过电力与候选检查——测试时请自行供电。",
+                    defaultDesc = "虚拟连接到 DEV中枢，绕过链路/电力/容量/范围全部判定。再按解除；真实绑定成功时自动解除。",
                     action = delegate
                     {
-                        wantSwitchOn = true;
-                        TryConnect();
-                        Log.Message("[CelesIM] DEV force-connect " + parent.def.defName + ": " +
-                            (IsConnected ? "bound -> " + (BoundNode?.LabelCap ?? "?") : "no candidate"));
+                        devForcedActive = !devForcedActive;
+                        Log.Message("[CelesIM] DEV force-active " + parent.def.defName + ": " + devForcedActive);
+                    }
+                };
+                // 批 4 终版 DEV：预热状态直改（归零=字段清零→进度 100% 完成态；重置=回满值→重新预热起点）
+                yield return new Command_Action
+                {
+                    defaultLabel = "DEV: 预热完成",
+                    action = delegate
+                    {
+                        warmUpRemaining = 0;
+                        Log.Message("[CelesIM] DEV warm-up zeroed (complete): " + parent.def.defName);
+                    }
+                };
+                yield return new Command_Action
+                {
+                    defaultLabel = "DEV: 预热重置",
+                    action = delegate
+                    {
+                        warmUpRemaining = Props.warmUpTicks;
+                        Log.Message("[CelesIM] DEV warm-up reset (cold start): " + parent.def.defName);
                     }
                 };
             }
@@ -195,8 +266,15 @@ namespace CelesFeature
 
         [Unsaved] private Material lackMat;
         [Unsaved] private bool lackMatTried;
+        // ── 批 3 B3：连接状态标志（与 Lack 脉动并存——两个不同含义：标志=连接状态，Lack=断连警示）──
+        [Unsaved] private Material markMatActive;
+        [Unsaved] private Material markMatBroken;
+        [Unsaved] private bool markMatsTried;
         public override void PostDraw()
         {
+            // 标志：绑定即显示（活跃=蓝/链不通=红，断电也红）——先于下方断电/活跃守卫
+            DrawLinkMark();
+
             if (powerComp != null && !powerComp.PowerOn)
                 return;   // 断电视觉由原版电力系统负责
             if (IsActiveConnection)
@@ -208,13 +286,37 @@ namespace CelesFeature
             }
             if (lackMat == null)
                 return;
-            float alpha = Mathf.Lerp(0.35f, 0.95f, Mathf.PingPong(Time.realtimeSinceStartup * 1.0f, 1f));
-            lackMat.SetColor("_Color", new Color(1f, 1f, 1f, alpha));
+            // R-IM1 原版范式（OverlayDrawer.cs:267）：thingIDNumber 相位散列错拍 + FadedMaterialPool 档位池化，共享材质只读零 SetColor
+            float pulse = (Mathf.Sin((Time.realtimeSinceStartup + 397f * (parent.thingIDNumber % 571)) * 4f) + 1f) * 0.5f;
+            float alpha = 0.35f + pulse * 0.6f;
             Vector3 iconPos = parent.DrawPos;
             iconPos.y += 0.3f;
             Graphics.DrawMesh(MeshPool.plane10,
                 Matrix4x4.TRS(iconPos, Quaternion.identity, new Vector3(0.6f, 1f, 0.6f)),
-                lackMat, 0);
+                FadedMaterialPool.FadedVersionOf(lackMat, alpha), 0);
+        }
+
+        // 标志绘制（批 3 B3）：无绑定不显示；绑定+IsActiveConnection=蓝 / 链不通=红（含断电）；
+        // 贴图路径 XML 配置（markTexPath 空=不启用）；材质 def 色惰性双份（渲染线程，坑#15）
+        private void DrawLinkMark()
+        {
+            if (Props.markTexPath.NullOrEmpty() || (!IsConnected && !devForcedActive))
+                return;
+            if (!markMatsTried)
+            {
+                markMatActive = MaterialPool.MatFrom(Props.markTexPath, ShaderDatabase.MoteGlow, Props.markColorActive);
+                markMatBroken = MaterialPool.MatFrom(Props.markTexPath, ShaderDatabase.MoteGlow, Props.markColorBroken);
+                markMatsTried = true;
+            }
+            Material mat = IsActiveConnection ? markMatActive : markMatBroken;
+            if (mat == null)
+                return;
+            Vector3 pos = parent.TrueCenter();
+            pos.z += Props.linkHeight;                            // 伪 3D 视觉高度（z+ 偏移——轴语义实证）
+            pos.y = AltitudeLayer.MetaOverlays.AltitudeFor();    // 与连线同排序层（不被建筑遮）
+            Graphics.DrawMesh(MeshPool.plane10,
+                Matrix4x4.TRS(pos, Quaternion.identity, new Vector3(Props.markDrawSize, 1f, Props.markDrawSize)),
+                mat, 0);
         }
 
         // ── Lifecycle ──
@@ -225,7 +327,7 @@ namespace CelesFeature
             if (Mgr != null)
                 Mgr.Notify_ConsumerSpawned(this);
             if (!respawningAfterLoad)
-                warmUpRemaining = 0;
+                warmUpRemaining = Props.warmUpTicks;   // 渐降 v3：新建=冷态出厂（满值=进度 0%；无预热 comp 写满无碍——IsWarmingUp 防御已滤）
             // 读档门（2026-09-20 裁决）：读档不自发连接——保留档内状态；仅玩家主动（建造）触发入网
             if (!respawningAfterLoad && HasPowerNow && !IsConnected)
                 TryConnect();
@@ -257,13 +359,40 @@ namespace CelesFeature
             Scribe_Values.Look(ref wantSwitchOn, "wantSwitchOn", true);
         }
 
+        // 冷却进度行（未连接/无信号共用——渐降可感知）：复用连接态同键同式（百分比+预计占位）；
+        // 两端稳态对称隐藏（完成 0 / 冷透满值返回空）
+        private string CoolingStatusPart()
+        {
+            if (!Props.haveWarmUpCount || warmUpRemaining <= 0 || warmUpRemaining >= Props.warmUpTicks)
+                return "";
+            int coolPercent = Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / Props.warmUpTicks));
+            return "CelesIM_Keyed_WarmingUp".Translate(coolPercent, "CelesIM_Keyed_WarmUpEtaNA".Translate());
+        }
+
         public override string CompInspectStringExtra()
         {
             string status;
-            if (!IsConnected)
+            if (devForcedActive)
+            {
+                status = "CelesIM_Keyed_StatusConnected".Translate("DEV中枢");   // DEV 豁免字面
+                if (IsWarmingUp)
+                {
+                    int percent = Props.warmUpTicks > 0
+                        ? Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / Props.warmUpTicks))
+                        : 100;
+                    status += "CelesIM_Keyed_WarmingUp".Translate(percent, warmUpRemaining.ToStringTicksToPeriod());
+                }
+            }
+            else if (!IsConnected)
+            {
                 status = "CelesIM_Keyed_StatusNotConnected".Translate();
+                status += CoolingStatusPart();   // 余温冷却行（渐降可感知）
+            }
             else if (!IsActiveConnection)
+            {
                 status = "CelesIM_Keyed_StatusNoSignal".Translate();
+                status += CoolingStatusPart();   // 批 4 终版：无信号同冷却（Q4 冻结改判）——滑落可见
+            }
             else
             {
                 string nodeLabel = BoundNode?.LabelCap ?? " ";
@@ -277,7 +406,22 @@ namespace CelesFeature
                     status += "CelesIM_Keyed_WarmingUp".Translate(percent, warmUpRemaining.ToStringTicksToPeriod());
                 }
             }
-            return "CelesIM_Keyed_TerminalInspect".Translate(ThreadCost, status, GetWorkSpeedFactor().ToString("F2"));
+            // 「尘构机效率: x50%（未连接, 预热中）」——x 前缀在键内字面（此值=纯百分比，勿再拼 x——
+            // 曾双 x 叠加返工）；括号原因=原版 CompReportWorkSpeed 行同构；
+            // 值与详情报文（StatWorker）/工作速度乘数（postfix）三处同源 GetWorkSpeedFactor
+            string factorText = GetWorkSpeedFactor().ToStringPercent();
+            // 括号原因=顺序互斥（照 StatPart 信息行同款裁决 2026-09-26）：
+            // 未连接→「未连接」（冷却/余温的身份语境）；连接预热中→「预热中」；无信号→由状态行承担
+            string reasons;
+            if (!IsConnected && !devForcedActive)
+                reasons = "CelesIM_Keyed_StatusNotConnected".Translate();
+            else if (IsWarmingUp)
+                reasons = "CelesIM_Keyed_ReasonWarming".Translate();
+            else
+                reasons = "";
+            if (reasons.Length > 0)
+                factorText += "（" + reasons + "）";
+            return "CelesIM_Keyed_TerminalInspect".Translate(ThreadCost, status, factorText);
         }
     }
 }

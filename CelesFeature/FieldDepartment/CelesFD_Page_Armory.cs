@@ -20,6 +20,7 @@ namespace CelesFeature
         private CelesFD_SupportDef selectedSupport;
         private Vector2 supportScrollPos;
         private Vector2 checkoutScrollPos;
+        private Vector2 infoScrollPos;       // ？帮助长文滚动（协议化 Info×3）
         private bool pendingRefresh;                    // 刷新确认态
         private Rect refreshConfirmRect;
         private float weaponCardH = CelesFD_UIConfig.CardMinHeight;   // 左栏卡片高（右栏人员卡共用——高度一致裁决）
@@ -530,7 +531,7 @@ namespace CelesFeature
             // ？帮助：武备+人员完整介绍（wordWrap 长文）
             if (infoActive)
             {
-                CelesFD_UIConfig.DrawInfoText(inner, "CelesFD_Keyed_InfoArmory".Translate());
+                CelesFD_UIConfig.DrawInfoText(inner, "CelesFD_Keyed_InfoArmory".Translate(), ref infoScrollPos);
                 return;
             }
 

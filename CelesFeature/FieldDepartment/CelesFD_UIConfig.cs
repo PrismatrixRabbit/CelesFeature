@@ -144,12 +144,17 @@ namespace CelesFeature
             return new GUIStyle(GetScaledStyle(size));
         }
 
-        // 帮助长文统一绘制（抽取 #3 + 风格统一 1b：三页同字号同留间隔——CurFontStyle 基准对齐其他 description）
-        public static void DrawInfoText(Rect rect, string text)
+        // 帮助长文统一绘制（抽取 #3 + 风格统一 1b：三页同字号同留间隔——CurFontStyle 基准对齐其他 description；
+        //   滚动支持：协议化长文（Info×3）超出子页高度——16f 滚动条预留（规范七.3），内容高实测 CalcLabelHeight）
+        public static void DrawInfoText(Rect rect, string text, ref Vector2 scrollPos)
         {
             GUIStyle style = new GUIStyle(Text.CurFontStyle);
             style.wordWrap = true;
-            GUI.Label(rect, text, style);
+            float contentWidth = rect.width - 16f;
+            float contentH = CalcLabelHeight(text, contentWidth);
+            Widgets.BeginScrollView(rect, ref scrollPos, new Rect(0f, 0f, contentWidth, contentH));
+            GUI.Label(new Rect(0f, 0f, contentWidth, contentH), text, style);
+            Widgets.EndScrollView();
         }
 
         // 锁定卡"封锁线"（2026-09-06 细节批）：底侧半透黑条带（全卡宽、恰容文本）+ 居中略大灰字（FontSub）

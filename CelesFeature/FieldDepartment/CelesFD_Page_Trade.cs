@@ -31,6 +31,7 @@ namespace CelesFeature
         private Vector2 acceptedScrollPos;
         private Vector2 cartScrollPos;
         private Vector2 checkoutScrollPos;   // ② 重构：结算区文本滚动
+        private Vector2 infoScrollPos;       // ？帮助长文滚动（协议化 Info×3）
 
         // 协议（§6.5）
         private bool agreeToTerms = true;               // 用户协议（默认勾选；不勾禁用下单）
@@ -664,7 +665,7 @@ namespace CelesFeature
             // ？帮助（R-1 UI 改造）：交易页机制介绍
             if (infoActive)
             {
-                CelesFD_UIConfig.DrawInfoText(rect.ContractedBy(10f), "CelesFD_Keyed_InfoTrade".Translate());
+                CelesFD_UIConfig.DrawInfoText(rect.ContractedBy(10f), "CelesFD_Keyed_InfoTrade".Translate(), ref infoScrollPos);
                 return;
             }
             if (selectedOrder == null) return;

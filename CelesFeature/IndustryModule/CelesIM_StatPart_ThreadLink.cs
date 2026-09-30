@@ -56,8 +56,14 @@ namespace CelesFeature
         public override void TransformValue(StatRequest req, ref float val)
         {
             CelesIM_CompThreadConsumer consumer = CelesIM_StatWorker_ThreadConsumerOnly.ConsumerOf(req);
-            if (consumer != null)
-                val *= consumer.WarmUpFactor;
+            if (consumer == null)
+                return;
+            if (consumer.CannotWorkUnconnected)
+            {
+                val = 0f;   // 依赖型未连接=无法工作（计算归零 2026-09-27——InfoCard 0% 与 Inspect 文字一致）
+                return;
+            }
+            val *= consumer.WarmUpFactor;
         }
 
         public override string ExplanationPart(StatRequest req)
@@ -65,6 +71,8 @@ namespace CelesFeature
             CelesIM_CompThreadConsumer consumer = CelesIM_StatWorker_ThreadConsumerOnly.ConsumerOf(req);
             if (consumer == null)
                 return null;
+            if (consumer.CannotWorkUnconnected)
+                return "CelesIM_Keyed_CannotWorkUnlinked".Translate();   // 基础 100%→最终 0% 的原因行（非乘数，无 x 前缀）
             if (!consumer.IsConnected)
                 return "CelesIM_Keyed_EffOffline".Translate() + ": x"
                     + consumer.EfficiencyFloor.ToStringPercent();

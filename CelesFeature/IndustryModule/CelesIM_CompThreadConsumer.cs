@@ -9,9 +9,9 @@ namespace CelesFeature
     public class CelesIM_CompProperties_ThreadConsumer : CompProperties
     {
         public int baseThreadsCost = 4;
-        public bool haveWarmUpCount = false;
-        public int warmUpTicks = 12500;
-        // ── 批 4 终版（数值链重构 2026-09-26）：canWorkOffline→stat Celes_ThreadDependency；
+        // ── 批 5 前置修订（2026-09-27 单源化）：haveWarmUpCount/warmUpTicks 废弃——
+        // 预热时长唯一源=stat Celes_WarmUpDuration（defaultBaseValue 0=无预热；statBases 配 ticks）；
+        // canWorkOffline→stat Celes_ThreadDependency（1=依赖/0=可离网——值义反转修订）；
         // offlineFactor→stat Celes_UnconnectedEfficiency（依赖型 default 0.1=预热起点，可离网型 statBases 配值）；
         // produceEfic 废弃（建筑倍速走原版 WorkTableWorkSpeedFactor 的 statBases）
         // 每 tick 冷却的预热进度（float 速率）。小数点不精确：≥1 截断取整为每 tick 流失 N；
@@ -64,7 +64,18 @@ namespace CelesFeature
         // ── 公开访问器（管理器/渲染/派生态查询）──
         public int ThreadCost => Props.baseThreadsCost;
         public bool HasPowerNow => powerComp?.PowerOn ?? true;
-        public bool IsWarmingUp => Props.haveWarmUpCount && warmUpRemaining > 0;
+
+        // 预热时长（ticks）——唯一源=stat Celes_WarmUpDuration（单源化 2026-09-27：0=无预热）
+        public int WarmUpDurationTicks => parent != null
+            ? Mathf.CeilToInt(parent.GetStatValue(CelesIM_DefOf.Celes_WarmUpDuration))
+            : 0;
+
+        // 依赖型且未连接（DEV 虚拟连接豁免）——无法工作态（效率归零+文字提示的统一判定）
+        public bool CannotWorkUnconnected =>
+            !IsConnected && !devForcedActive
+            && parent.GetStatValue(CelesIM_DefOf.Celes_ThreadDependency) >= 0.5f;   // 1=依赖
+
+        public bool IsWarmingUp => WarmUpDurationTicks > 0 && warmUpRemaining > 0;
 
         private CelesIM_ThreadNetworkManager Mgr =>
             parent == null || parent.Map == null ? null : CelesIM_ThreadNetworkManager.For(parent.Map);
@@ -82,7 +93,7 @@ namespace CelesFeature
         public float EfficiencyFloor => parent.GetStatValue(CelesIM_DefOf.Celes_UnconnectedEfficiency);
 
         public float WarmUpFactor => IsWarmingUp
-            ? EfficiencyFloor + (1f - EfficiencyFloor) * (1f - (float)warmUpRemaining / Props.warmUpTicks)
+            ? EfficiencyFloor + (1f - EfficiencyFloor) * (1f - (float)warmUpRemaining / WarmUpDurationTicks)
             : 1f;
 
         // 批 4（E5·B' 终案）：效率因子单一真相源=尘构机效率 stat 的 parts 乘法链——
@@ -108,7 +119,7 @@ namespace CelesFeature
         public void SeverFromNetwork()
         {
             Mgr?.UnbindConsumer(this);
-            warmUpRemaining = Props.warmUpTicks;
+            warmUpRemaining = WarmUpDurationTicks;
         }
 
         // ============================================================
@@ -118,22 +129,22 @@ namespace CelesFeature
         // ============================================================
         internal void TickWarmup()
         {
-            if (!Props.haveWarmUpCount)
+            if (WarmUpDurationTicks <= 0)
                 return;
             if (Mgr != null && Mgr.IsActiveConnection(this))
             {
                 if (warmUpRemaining > 0)
                     warmUpRemaining--;                                   // 加热：剩余时间递减
             }
-            else if (!IsConnected && warmUpRemaining < Props.warmUpTicks)
+            else if (!IsConnected && warmUpRemaining < WarmUpDurationTicks)
             {
                 // 冷却（仅未连接——无信号=冻结，裁决 2026-09-26 复位：绑定保留态进度不增不减）：
                 // 速率双档换算（小数不精确——见 Props.warmUpDecayPerTick 注释；无状态直算）
                 float rate = Props.warmUpDecayPerTick;
                 if (rate >= 1f)
-                    warmUpRemaining = Mathf.Min(Props.warmUpTicks, warmUpRemaining + (int)rate);
+                    warmUpRemaining = Mathf.Min(WarmUpDurationTicks, warmUpRemaining + (int)rate);
                 else if (rate > 0f && Find.TickManager.TicksGame % Mathf.Max(1, Mathf.RoundToInt(1f / rate)) == 0)
-                    warmUpRemaining = Mathf.Min(Props.warmUpTicks, warmUpRemaining + 1);
+                    warmUpRemaining = Mathf.Min(WarmUpDurationTicks, warmUpRemaining + 1);
             }
         }
 
@@ -243,7 +254,7 @@ namespace CelesFeature
                     defaultLabel = "DEV: 预热重置",
                     action = delegate
                     {
-                        warmUpRemaining = Props.warmUpTicks;
+                        warmUpRemaining = WarmUpDurationTicks;
                         Log.Message("[CelesIM] DEV warm-up reset (cold start): " + parent.def.defName);
                     }
                 };
@@ -327,7 +338,7 @@ namespace CelesFeature
             if (Mgr != null)
                 Mgr.Notify_ConsumerSpawned(this);
             if (!respawningAfterLoad)
-                warmUpRemaining = Props.warmUpTicks;   // 渐降 v3：新建=冷态出厂（满值=进度 0%；无预热 comp 写满无碍——IsWarmingUp 防御已滤）
+                warmUpRemaining = WarmUpDurationTicks;   // 渐降 v3：新建=冷态出厂（满值=进度 0%；无预热 comp 写满无碍——IsWarmingUp 防御已滤）
             // 读档门（2026-09-20 裁决）：读档不自发连接——保留档内状态；仅玩家主动（建造）触发入网
             if (!respawningAfterLoad && HasPowerNow && !IsConnected)
                 TryConnect();
@@ -363,9 +374,9 @@ namespace CelesFeature
         // 两端稳态对称隐藏（完成 0 / 冷透满值返回空）
         private string CoolingStatusPart()
         {
-            if (!Props.haveWarmUpCount || warmUpRemaining <= 0 || warmUpRemaining >= Props.warmUpTicks)
+            if (WarmUpDurationTicks <= 0 || warmUpRemaining <= 0 || warmUpRemaining >= WarmUpDurationTicks)
                 return "";
-            int coolPercent = Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / Props.warmUpTicks));
+            int coolPercent = Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / WarmUpDurationTicks));
             return "CelesIM_Keyed_WarmingUp".Translate(coolPercent, "CelesIM_Keyed_WarmUpEtaNA".Translate());
         }
 
@@ -377,8 +388,8 @@ namespace CelesFeature
                 status = "CelesIM_Keyed_StatusConnected".Translate("DEV中枢");   // DEV 豁免字面
                 if (IsWarmingUp)
                 {
-                    int percent = Props.warmUpTicks > 0
-                        ? Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / Props.warmUpTicks))
+                    int percent = WarmUpDurationTicks > 0
+                        ? Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / WarmUpDurationTicks))
                         : 100;
                     status += "CelesIM_Keyed_WarmingUp".Translate(percent, warmUpRemaining.ToStringTicksToPeriod());
                 }
@@ -400,8 +411,8 @@ namespace CelesFeature
                 if (IsWarmingUp)
                 {
                     // 批 2 修正：进度百分比（C# 预格式）+ 剩余时间走原版统一格式化器（GenDate:254）
-                    int percent = Props.warmUpTicks > 0
-                        ? Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / Props.warmUpTicks))
+                    int percent = WarmUpDurationTicks > 0
+                        ? Mathf.RoundToInt(100f * (1f - (float)warmUpRemaining / WarmUpDurationTicks))
                         : 100;
                     status += "CelesIM_Keyed_WarmingUp".Translate(percent, warmUpRemaining.ToStringTicksToPeriod());
                 }
@@ -409,6 +420,10 @@ namespace CelesFeature
             // 「尘构机效率: x50%（未连接, 预热中）」——x 前缀在键内字面（此值=纯百分比，勿再拼 x——
             // 曾双 x 叠加返工）；括号原因=原版 CompReportWorkSpeed 行同构；
             // 值与详情报文（StatWorker）/工作速度乘数（postfix）三处同源 GetWorkSpeedFactor
+            // 依赖型未连接=无法工作（文字替代数值——计算层同步归零，裁决 2026-09-27）
+            if (CannotWorkUnconnected)
+                return "CelesIM_Keyed_TerminalInspect".Translate(ThreadCost, status,
+                    "CelesIM_Keyed_CannotWorkUnlinked".Translate());
             string factorText = GetWorkSpeedFactor().ToStringPercent();
             // 括号原因=顺序互斥（照 StatPart 信息行同款裁决 2026-09-26）：
             // 未连接→「未连接」（冷却/余温的身份语境）；连接预热中→「预热中」；无信号→由状态行承担

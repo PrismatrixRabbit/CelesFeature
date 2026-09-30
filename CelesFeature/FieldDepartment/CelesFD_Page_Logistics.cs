@@ -22,6 +22,7 @@ namespace CelesFeature
         }
         private Vector2 inTransitScrollPos;
         private Vector2 historyScrollPos;
+        private Vector2 infoScrollPos;   // ？帮助长文滚动（协议化 Info×3）
         private bool infoActive;   // ？帮助（R-1 UI 改造：子页显示物流页机制介绍）
 
 
@@ -211,7 +212,7 @@ namespace CelesFeature
             // ？帮助（R-1 UI 改造）优先：物流页机制介绍（替代常态站点状态）
             if (infoActive)
             {
-                CelesFD_UIConfig.DrawInfoText(inner, "CelesFD_Keyed_InfoLogistics".Translate());
+                CelesFD_UIConfig.DrawInfoText(inner, "CelesFD_Keyed_InfoLogistics".Translate(), ref infoScrollPos);
                 return;
             }
             Widgets.Label(new Rect(inner.x, inner.y, inner.width, 24f), "CelesFD_Keyed_LogisticsStatus".Translate());

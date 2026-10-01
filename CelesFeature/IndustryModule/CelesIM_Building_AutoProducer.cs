@@ -60,6 +60,10 @@ namespace CelesFeature
             base.EjectContents();
         }
 
+        // 容器内活体 Pawn（母本 GestatingMech :68-79 同款，去复活 Corpse 支路）——
+        // b 模型 Formed 后产物所在；提取路由 patch（Patch_GenRecipe_PawnRoute）与 DrawAt 序0 双消费
+        public Pawn GestatingPawn => innerContainer.FirstOrDefault((Thing t) => t is Pawn) as Pawn;
+
         // ═══ 培育器音频模式五件套（母本 Building_MechGestator:105-188；Biotech def null 守卫=无 DLC 静默降级）═══
 
         // Forming 开始一次性音（母本 :105-107）
@@ -122,10 +126,14 @@ namespace CelesFeature
             }
         }
 
-        // ═══ 锻造内容物绘制（视觉修订批 2026-09-30）：配方侧 ext 定义 ═══
+        // ═══ 锻造内容物绘制（视觉修订批 2026-09-30 + U2 双态 2026-10-02）：配方侧 ext 定义 ═══
         // 图层（高→低）：内容物(MoteOverhead) > 流光(BuildingOnTop) > 底层建筑(Building)——遮挡靠 y 排序；
         // 浮起感走 z（轴语义实证：y 仅排序不产生屏幕位移，z 才是视觉高度）
         // 状态门=State≠Gathering（不判 CanWork——冻结时半成品仍留舱，培育器 DrawAt 同款）
+        // 优先级四态：序0 容器含 Pawn（b 模型 Formed）→ 本体图（母本 TryGetMechFormingGraphic :238-255
+        //   同构：CurKindLifeStage.bodyGraphicData.Graphic+尺寸守卫超限回落；恒南向 :210）；
+        //   其余按 ext 三态（useProductGraphic → 产物 def 图 / graphic → 专用图 / 均无 → 不显示）——
+        //   a 模型容器永无 Pawn，序0 不命中=行为零变化
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)   // 基类为 protected virtual（Thing.cs:1324）
         {
             base.DrawAt(drawLoc, flip);
@@ -134,7 +142,7 @@ namespace CelesFeature
                 return;
             }
             CelesIM_FormingGraphicExt ext = ResolveContentExt();
-            Graphic content = ResolveContentGraphic(ext);
+            Graphic content = ResolveFormedGraphic(ext) ?? ResolveContentGraphic(ext);
             if (content == null)
             {
                 return;
@@ -146,6 +154,30 @@ namespace CelesFeature
                 loc.z += Mathf.PingPong(Find.TickManager.TicksGame * ext.bobSpeed, ext.bobDistance);   // 母本 PingPong 同款（z 浮动）
             }
             content.Draw(loc, Rot4.South, this);
+        }
+
+        // 序0：容器含 Pawn → 自动本体图（方案 A 裁决 10-02）。守卫限值取 ext.maxFormedDrawSize
+        // （默认 1.5 对齐原版 BuildingProperties.cs:366）——超大 race 回落 ext 专用图防溢出。
+        // 非人形机械体 CurKindLifeStage 直取 lifeStages[当前段]（Pawn_AgeTracker.cs:193；
+        // humanlike 报错分支不触及——.? 守卫兜异常形态）
+        private Graphic ResolveFormedGraphic(CelesIM_FormingGraphicExt ext)
+        {
+            Pawn gestatingPawn = GestatingPawn;
+            if (gestatingPawn == null)
+            {
+                return null;
+            }
+            Graphic bodyGraphic = gestatingPawn.ageTracker?.CurKindLifeStage?.bodyGraphicData?.Graphic;
+            if (bodyGraphic == null)
+            {
+                return null;
+            }
+            Vector2 max = ext?.maxFormedDrawSize ?? new Vector2(1.5f, 1.5f);
+            if (bodyGraphic.drawSize.x <= max.x && bodyGraphic.drawSize.y <= max.y)
+            {
+                return bodyGraphic;
+            }
+            return null;
         }
 
         // last-wins：li 跨继承追加（父类默认在前，子配方覆盖在后）——取末位=最specific定义；

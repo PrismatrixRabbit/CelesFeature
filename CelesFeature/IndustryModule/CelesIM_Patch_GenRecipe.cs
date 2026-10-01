@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -30,6 +31,34 @@ namespace CelesFeature
             compQuality.SetQuality(QualityCategory.Normal, ArtGenerationContext.Colony);
             Log.Warning("[CelesIM] " + "CelesIM_Keyed_QualityForced".Translate(product.Label));
             __result = product;
+            return false;
+        }
+    }
+
+    // ═══ U2：b 模型提取路由（D12+F5-31⑵ · 2026-10-02）═══
+    // MakeRecipeProducts 对 race 产物=ThingMaker.MakeThing(Pawn def) 错误路径（未初始化裸 Pawn）——
+    // prefix skip 整个迭代器（外壳方法层拦截=状态机从不创建体内不执行；与 D19 品质闸 postfix
+    // 拦不到体内为对偶原理：skip 不依赖体内时机）；
+    // a 模型不命中（category!=Pawn）原样放行——「零 patch」承诺对 a 保持。
+    // skip 后 toil 层 ConsumeIngredients（b 模型空表无害）/Notify_IterationCompleted（Reset 复位）照常执行
+    //（Toils_Recipe.cs:199-201）；Pawn 产物无 CompQuality=品质闸 prefix 天然放行，两闸无交集。
+    [HarmonyPatch(typeof(GenRecipe), "MakeRecipeProducts")]
+    public static class CelesIM_Patch_GenRecipe_PawnRoute
+    {
+        public static bool Prefix(RecipeDef recipeDef, IBillGiver billGiver, ref IEnumerable<Thing> __result)
+        {
+            if (!(billGiver is CelesIM_Building_AutoProducer producer) || !CelesIM_Bill_AutoProducer.ProducesPawn(recipeDef))
+            {
+                return true;
+            }
+            Pawn pawn = producer.GestatingPawn;
+            if (pawn == null)
+            {
+                Log.Error("[CelesIM] Pawn-route extraction hit but container holds no Pawn. recipe=" + recipeDef.defName);
+                __result = new List<Thing>();   // 空产物终止（勿回落原方法——MakeThing(race)=错产）
+                return false;
+            }
+            __result = new List<Thing> { pawn };
             return false;
         }
     }

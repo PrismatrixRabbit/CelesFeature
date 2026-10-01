@@ -23,5 +23,10 @@ namespace CelesFeature
         public float bobDistance = 0f;            // z 向浮动幅度（0=静止；>0 时 PingPong 呼吸，母本同款）
 
         public float bobSpeed = 0.04f;            // 浮动速率（占位，实测调；母本 formingMechBobSpeed 同位）
+
+        // U2 方案 A（10-02）：容器内 Pawn 本体图（序0）尺寸守卫上限——drawSize 超限回落 ext.graphic
+        // 专用图（母本 maxFormedMechDrawSize 同义，原版落建筑侧 BuildingProperties 默认 1.5；我方移
+        // 配方侧=多配方各配各的档位）。Cleaner 0.7/Test 1.5 均在限内
+        public Vector2 maxFormedDrawSize = new Vector2(1.5f, 1.5f);
     }
 }

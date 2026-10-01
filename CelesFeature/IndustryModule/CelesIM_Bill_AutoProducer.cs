@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using RimWorld;
 using UnityEngine;
@@ -33,6 +34,34 @@ namespace CelesFeature
         private CelesIM_Building_AutoProducer Producer => (CelesIM_Building_AutoProducer)billStack.billGiver;
 
         private float WorkSpeedMultiplier => Producer.GetStatValue(recipe.workTableSpeedStat);
+
+        // ═══ U2：b 模型（Pawn 产出，2026-10-02）═══
+        // 判别器单点（D12+F5-31⑵ 单点纪律）：本覆写与提取路由 patch（Patch_GenRecipe）两消费方共用。
+        // category 比较用 ThingCategory.Pawn 枚举（原版惯例 Building_Door.cs:175）——
+        // ThingCategoryDefOf 系物品分类树 DefOf，与 Thing.category 无关且无 Pawn 字段。
+        public static bool ProducesPawn(RecipeDef r)
+        {
+            return r.ProducedThingDef?.category == ThingCategory.Pawn;
+        }
+
+        // 母本 Bill_ProductionMech.CreateProducts（:20-27）抄改两处：
+        // ①BoundPawn.Faction → Producer.Faction（我方无绑定者，D2 剥 mechanitor；billGiver 为
+        //   IBillGiver 接口无 Faction——经 Producer 属性转 Building 取 Thing.Faction）；
+        // ②去 Overseer 关系行（无机械师体系）。
+        // PawnGenerationRequest 具名传参（母本位置参数冗余值=构造器默认可省，PawnGenerationRequest.cs:151）：
+        // developmentalStages 默认 Adult 须显式覆盖 Newborn（机械体新生儿）；allowDowned 默认 false 须显式 true（母本同）。
+        // 未命中判别器 → null（a 模型：提取时 MakeRecipeProducts 现做，原路径不动）。
+        public override Thing CreateProducts()
+        {
+            if (!ProducesPawn(recipe))
+            {
+                return null;
+            }
+            PawnKindDef kind = DefDatabase<PawnKindDef>.AllDefs.Where((PawnKindDef pk) => pk.race == recipe.ProducedThingDef).First();
+            Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(kind, Producer.Faction,
+                PawnGenerationContext.NonPlayer, allowDowned: true, developmentalStages: DevelopmentalStage.Newborn));
+            return pawn;
+        }
 
         // 母本 :147-168 逐行抄改（乘数换源：绑定者 stat → 建筑 stat）
         public override void BillTick()

@@ -7,7 +7,7 @@ namespace CelesFeature
     [DefOf]
     public static class CelesIM_DefOf
     {
-        public static JobDef CelesIM_FixHubFault;
+        public static JobDef CelesIM_FixProducerFault;
 
         // 批 4：尘构机效率 stat（单一真相源——GetWorkSpeedFactor 经 GetStatValue 读此 stat 的 parts 乘法链）
         public static StatDef Celes_ThreadLinkEfficiency;
@@ -25,5 +25,8 @@ namespace CelesFeature
 
         // 批 5 视觉修订批：锻造流光 mote（单南向起步——建筑 Graphic_Single 不旋转；转 Multi 时补 east/west/north 同族+per-rotation 字典）
         public static ThingDef Celes_Mote_ForgeGlow_South;
+
+        // 批 6 D36：星铃 race（Race_Celes.xml——星铃调频乘数的操作者判定）
+        public static ThingDef Celes_Race;
     }
 }

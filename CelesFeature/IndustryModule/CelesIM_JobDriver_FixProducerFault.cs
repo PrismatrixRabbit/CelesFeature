@@ -10,7 +10,7 @@ namespace CelesFeature
     //   （逐堆 Goto→StartCarryThing→转入 pawn.inventory 循环——原版双 Driver 复用先例之一）；
     //   预留 = 照抄 JobDriver_CarryToBiosculpterPod.cs:24-38 队列形状；
     //   终结消费 = 自写最小段（按份额销毁背包材料 + 原版成功率判定 + Notify_FaultRepaired）
-    public class CelesIM_JobDriver_FixHubFault : JobDriver
+    public class CelesIM_JobDriver_FixProducerFault : JobDriver
     {
         private const TargetIndex BuildingInd = TargetIndex.A;
 
@@ -45,8 +45,8 @@ namespace CelesFeature
             }
             yield return Toils_Goto.GotoThing(BuildingInd, PathEndMode.Touch)
                 .FailOnDespawnedOrNull(BuildingInd);
-            CelesIM_CompThreadProducer hub = Building.TryGetComp<CelesIM_CompThreadProducer>();
-            Toil wait = Toils_General.Wait(hub != null ? hub.Props.faultRepairWorkTicks : 1000);
+            CelesIM_CompThreadProducer producer = Building.TryGetComp<CelesIM_CompThreadProducer>();
+            Toil wait = Toils_General.Wait(producer != null ? producer.Props.faultRepairWorkTicks : 1000);
             wait.FailOnDespawnedOrNull(BuildingInd);
             wait.FailOnCannotTouch(BuildingInd, PathEndMode.Touch);
             wait.WithEffect(Building.def.repairEffect, BuildingInd);
@@ -57,7 +57,7 @@ namespace CelesFeature
             finalize.initAction = delegate
             {
                 // 终结消费（自写最小段）：按份额销毁背包材料合计 count 件
-                ConsumePickedUpIngredients(hub != null ? hub.Props.faultRepairCount : job.count);
+                ConsumePickedUpIngredients(producer != null ? producer.Props.faultRepairCount : job.count);
                 if (Rand.Value > pawn.GetStatValue(StatDefOf.FixBrokenDownBuildingSuccessChance))
                 {
                     MoteMaker.ThrowText((pawn.DrawPos + Building.DrawPos) / 2f, Map,

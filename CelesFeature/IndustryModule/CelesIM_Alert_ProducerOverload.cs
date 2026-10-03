@@ -6,11 +6,11 @@ namespace CelesFeature
 {
     // 中枢超载 Alert（E+F 批：读取改自定义 FaultActive——原版 CompBreakdownable 已禁用；
     // 数据源全图扫描留 G 批改管理器注册表）
-    public class CelesIM_Alert_HubOverload : Alert
+    public class CelesIM_Alert_ProducerOverload : Alert
     {
         private CelesIM_CompThreadProducer target;
 
-        public CelesIM_Alert_HubOverload()
+        public CelesIM_Alert_ProducerOverload()
         {
             defaultLabel = "CelesIM_Keyed_AlertOverloadLabel".Translate();
             defaultExplanation = "CelesIM_Keyed_AlertOverloadDesc".Translate();
@@ -37,10 +37,10 @@ namespace CelesFeature
             for (int i = 0; i < maps.Count; i++)
             {
                 // G 批：数据源 = 管理器注册表（O(注册数)，替代全图遍历）——判定语义不变
-                List<CelesIM_CompThreadProducer> hubs = CelesIM_ThreadNetworkManager.For(maps[i]).HubsForReading;
-                for (int j = 0; j < hubs.Count; j++)
+                List<CelesIM_CompThreadProducer> producers = CelesIM_ThreadNetworkManager.For(maps[i]).ProducersForReading;
+                for (int j = 0; j < producers.Count; j++)
                 {
-                    CelesIM_CompThreadProducer p = hubs[j];
+                    CelesIM_CompThreadProducer p = producers[j];
                     if (p == null || p.parent == null || p.IsShutdownByInterference)
                         continue;
 

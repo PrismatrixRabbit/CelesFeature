@@ -82,4 +82,45 @@ namespace CelesFeature
             return null;
         }
     }
+
+    // ════════════════════════════════════════════════════════════════
+    // 批 6 D36：星铃调频乘数 part（2026-10-03）——落尘构机效率 stat（D40 修订）
+    // · 乘法链：BillTick WorkSpeedMultiplier → GetStatValue(WorkTableWorkSpeedFactor) →
+    //   P1 postfix → GetWorkSpeedFactor → GetStatValue(Celes_ThreadLinkEfficiency) → 本 part ×1.2
+    //   → 周期 ETA（AppendForgeCycles）/终端 Inspect 尘构机效率行/InfoCard 分解行全链自动跟随
+    // · 判定源=CelesIM_CompStarlinkTuning（收尾修正 10-03 解耦：原直判建筑类型，comp 化后
+    //   双形态可挂任意建筑——A=自动生产机 bill 旗标 / B=常规工作台操作者判定，见该文件头）
+    // · 注入：XML parts li（Stats_Building.xml Celes_ThreadLinkEfficiency，与 ThreadProgress 同位）
+    // ════════════════════════════════════════════════════════════════
+    public class CelesIM_StatPart_StarlinkTuning : StatPart
+    {
+        public override void TransformValue(StatRequest req, ref float val)
+        {
+            if (!Tuned(req))
+            {
+                return;
+            }
+            val *= CelesIM_Bill_AutoProducer.StarlinkTuningFactor;
+        }
+
+        public override string ExplanationPart(StatRequest req)
+        {
+            if (!Tuned(req))
+            {
+                return null;   // 未调频不占分解行（原版 StatPart 仅在生效时显示，与 ThreadLink 同构）
+            }
+            return "CelesIM_Keyed_StarlinkTuning".Translate(
+                CelesIM_Bill_AutoProducer.StarlinkTuningFactor.ToStringPercent());
+        }
+
+        private static bool Tuned(StatRequest req)
+        {
+            if (!req.HasThing)
+            {
+                return false;
+            }
+            CelesIM_CompStarlinkTuning tuning = req.Thing.TryGetComp<CelesIM_CompStarlinkTuning>();
+            return tuning != null && tuning.TuningActive;
+        }
+    }
 }

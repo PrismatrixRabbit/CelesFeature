@@ -62,7 +62,21 @@ namespace CelesFeature
         [Unsaved] internal bool devForcedActive;
 
         // ── 公开访问器（管理器/渲染/派生态查询）──
-        public int ThreadCost => Props.baseThreadsCost;
+        // 批 6 C（D42-④ 方案1 乘数）：超频激活时占用 ×threadCostFactor——消费面 7 点全经本属性
+        // 单点（预核 2 实证：连接候选/Inspect×2/LoadOf/LoadOfSplit/子树求和/容量门），无超频 comp=原值
+        public int ThreadCost
+        {
+            get
+            {
+                int cost = Props.baseThreadsCost;
+                CelesIM_CompOverclock oc = parent?.GetComp<CelesIM_CompOverclock>();
+                if (oc != null && oc.Active)
+                {
+                    cost = Mathf.RoundToInt(cost * oc.Props.threadCostFactor);
+                }
+                return cost;
+            }
+        }
         public bool HasPowerNow => powerComp?.PowerOn ?? true;
 
         // 预热时长（ticks）——唯一源=stat Celes_WarmUpDuration（单源化 2026-09-27：0=无预热）
@@ -417,16 +431,19 @@ namespace CelesFeature
                     status += "CelesIM_Keyed_WarmingUp".Translate(percent, warmUpRemaining.ToStringTicksToPeriod());
                 }
             }
-            // 「尘构机效率: x50%（未连接, 预热中）」——x 前缀在键内字面（此值=纯百分比，勿再拼 x——
-            // 曾双 x 叠加返工）；括号原因=原版 CompReportWorkSpeed 行同构；
+            // 「尘构机效率: x50% (未连接)」——x 前缀在键内字面（此值=纯百分比，勿再拼 x——
+            // 曾双 x 叠加返工）；括号原因=原版 CompReportWorkSpeed 行同构（半角+逗号拼接）；
             // 值与详情报文（StatWorker）/工作速度乘数（postfix）三处同源 GetWorkSpeedFactor
             // 依赖型未连接=无法工作（文字替代数值——计算层同步归零，裁决 2026-09-27）
             if (CannotWorkUnconnected)
                 return "CelesIM_Keyed_TerminalInspect".Translate(ThreadCost, status,
                     "CelesIM_Keyed_CannotWorkUnlinked".Translate());
             string factorText = GetWorkSpeedFactor().ToStringPercent();
-            // 括号原因=顺序互斥（照 StatPart 信息行同款裁决 2026-09-26）：
-            // 未连接→「未连接」（冷却/余温的身份语境）；连接预热中→「预热中」；无信号→由状态行承担
+            // 括号原因=原版 CompReportWorkSpeed 语义（机械加工台，用户裁决 10-03 对齐原版）：
+            // 逗号拼接列表非互斥——状态原因（未连接/预热中互斥=数值身份语境）+ 在链设施贡献者逐个追加；
+            // 设施取 statOffsets 对 Celes_ThreadLinkEfficiency 非零者，活性过滤与实际生效路径同谓词
+            // （CompAffectedByFacilities.GetStatOffset:475 IsFacilityActive——原版括号循环不查活性
+            // 系工具柜无电概念，我方塔有电，显示同步红线优先：断电塔无实效不列名）
             string reasons;
             if (!IsConnected && !devForcedActive)
                 reasons = "CelesIM_Keyed_StatusNotConnected".Translate();
@@ -434,8 +451,27 @@ namespace CelesFeature
                 reasons = "CelesIM_Keyed_ReasonWarming".Translate();
             else
                 reasons = "";
+            CompAffectedByFacilities facilities = parent.GetComp<CompAffectedByFacilities>();
+            if (facilities != null)
+            {
+                List<Thing> linked = facilities.LinkedFacilitiesListForReading;
+                for (int i = 0; i < linked.Count; i++)
+                {
+                    CompFacility facility = linked[i].TryGetComp<CompFacility>();
+                    if (facility == null || !facility.CanBeActive)
+                        continue;
+                    if (facility.Props.statOffsets != null
+                        && facility.Props.statOffsets.GetStatOffsetFromList(
+                            CelesIM_DefOf.Celes_ThreadLinkEfficiency) != 0f)
+                    {
+                        if (reasons.Length > 0)
+                            reasons += ", ";
+                        reasons += linked[i].def.label;
+                    }
+                }
+            }
             if (reasons.Length > 0)
-                factorText += "（" + reasons + "）";
+                factorText += " (" + reasons + ")";
             return "CelesIM_Keyed_TerminalInspect".Translate(ThreadCost, status, factorText);
         }
     }

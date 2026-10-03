@@ -42,7 +42,7 @@ namespace CelesFeature
         }
 
         // ── 注册表（[Unsaved]——运行期由 Spawn/Despawn 同步维护；FinalizeInit 全量重建兜底）──
-        [Unsaved] private readonly List<CelesIM_CompThreadProducer> hubs = new List<CelesIM_CompThreadProducer>();
+        [Unsaved] private readonly List<CelesIM_CompThreadProducer> producers = new List<CelesIM_CompThreadProducer>();
         [Unsaved] private readonly List<CelesIM_CompThreadRelay> relays = new List<CelesIM_CompThreadRelay>();
         [Unsaved] private readonly List<CelesIM_CompThreadConsumer> consumers = new List<CelesIM_CompThreadConsumer>();
 
@@ -54,13 +54,13 @@ namespace CelesFeature
         [Unsaved] private readonly Dictionary<Thing, List<Thing>> directChildren = new Dictionary<Thing, List<Thing>>();
 
         // ═══ 只读注册表暴露（G：双 Alert 数据源；I：PlaceWorker 预览与唤醒扫描——替代全图遍历）═══
-        public List<CelesIM_CompThreadProducer> HubsForReading => hubs;
+        public List<CelesIM_CompThreadProducer> ProducersForReading => producers;
         public List<CelesIM_CompThreadRelay> RelaysForReading => relays;
         public List<CelesIM_CompThreadConsumer> ConsumersForReading => consumers;
 
         // ═══ 注册查询 ═══
 
-        public int ExistingHubCount => hubs.Count;
+        public int ExistingProducerCount => producers.Count;
 
         // E9：thingIDNumber 升序首个存在的中枢 = 活跃中枢（存在数口径；断电/故障者同样占位）
         public CelesIM_CompThreadProducer ActiveCore
@@ -68,26 +68,26 @@ namespace CelesFeature
             get
             {
                 CelesIM_CompThreadProducer best = null;
-                foreach (CelesIM_CompThreadProducer hub in hubs)
+                foreach (CelesIM_CompThreadProducer producer in producers)
                 {
-                    if (hub == null || hub.parent == null || !hub.parent.Spawned) continue;
-                    if (best == null || hub.parent.thingIDNumber < best.parent.thingIDNumber)
-                        best = hub;
+                    if (producer == null || producer.parent == null || !producer.parent.Spawned) continue;
+                    if (best == null || producer.parent.thingIDNumber < best.parent.thingIDNumber)
+                        best = producer;
                 }
                 return best;
             }
         }
 
-        public bool IsOnlineHub(Thing thing)
+        public bool IsOnlineProducer(Thing thing)
         {
-            CelesIM_CompThreadProducer hub = thing?.TryGetComp<CelesIM_CompThreadProducer>();
-            return hub != null && hub.IsOnline;
+            CelesIM_CompThreadProducer producer = thing?.TryGetComp<CelesIM_CompThreadProducer>();
+            return producer != null && producer.IsOnline;
         }
 
         public bool IsInterferenceShutdown(Thing thing)
         {
-            CelesIM_CompThreadProducer hub = thing?.TryGetComp<CelesIM_CompThreadProducer>();
-            return hub != null && hub.IsShutdownByInterference;
+            CelesIM_CompThreadProducer producer = thing?.TryGetComp<CelesIM_CompThreadProducer>();
+            return producer != null && producer.IsShutdownByInterference;
         }
 
         // ═══ 绑定图查询 ═══
@@ -107,13 +107,13 @@ namespace CelesFeature
         }
 
         // 中枢负载 = 直连终端 ThreadCost + 直连中继子树负载（无缓存——2026-09-13 Q2 裁决）
-        public int LoadOf(Thing hubThing)
+        public int LoadOf(Thing producerThing)
         {
-            if (hubThing == null) return 0;
-            CelesIM_CompThreadProducer hub = hubThing.TryGetComp<CelesIM_CompThreadProducer>();
-            if (hub == null) return 0;
+            if (producerThing == null) return 0;
+            CelesIM_CompThreadProducer producer = producerThing.TryGetComp<CelesIM_CompThreadProducer>();
+            if (producer == null) return 0;
             int load = 0;
-            List<Thing> children = GetDirectChildren(hubThing);
+            List<Thing> children = GetDirectChildren(producerThing);
             if (children == null) return 0;
             for (int i = 0; i < children.Count; i++)
             {
@@ -131,12 +131,12 @@ namespace CelesFeature
 
         // ═══ 批 2：负载拆双段（活跃/无信号——Gizmo 嵌套格数据源；SubtreeLoad 同形扩展）═══
 
-        public void LoadOfSplit(Thing hubThing, out int activeLoad, out int noSignalLoad)
+        public void LoadOfSplit(Thing producerThing, out int activeLoad, out int noSignalLoad)
         {
             activeLoad = 0;
             noSignalLoad = 0;
-            if (hubThing == null) return;
-            SplitChildren(hubThing, ref activeLoad, ref noSignalLoad);
+            if (producerThing == null) return;
+            SplitChildren(producerThing, ref activeLoad, ref noSignalLoad);
         }
 
         private void SplitChildren(Thing node, ref int activeLoad, ref int noSignalLoad)
@@ -192,8 +192,8 @@ namespace CelesFeature
         public bool IsNodeChainActive(Thing node)
         {
             if (node == null || !node.Spawned) return false;
-            CelesIM_CompThreadProducer hub = node.TryGetComp<CelesIM_CompThreadProducer>();
-            if (hub != null) return hub.IsOnline;
+            CelesIM_CompThreadProducer producer = node.TryGetComp<CelesIM_CompThreadProducer>();
+            if (producer != null) return producer.IsOnline;
             CelesIM_CompThreadRelay relay = node.TryGetComp<CelesIM_CompThreadRelay>();
             return relay != null && relay.HasPowerNow && IsNodeChainActive(GetRelayParent(node));
         }
@@ -221,14 +221,14 @@ namespace CelesFeature
         public List<Thing> CandidateNodesForConsumer(IntVec3 fromPos, int threadCost, Thing excludeNode)
         {
             var result = new List<(Thing node, int priority, float distSq)>();
-            foreach (CelesIM_CompThreadProducer hub in hubs)
+            foreach (CelesIM_CompThreadProducer producer in producers)
             {
-                if (hub == null || hub.parent == null || !hub.parent.Spawned || hub.parent == excludeNode) continue;
-                if (!hub.IsOnline) continue;
-                float distSq = DistanceSquared(fromPos, hub.parent.Position);
-                if (distSq > hub.Props.connectRadius * hub.Props.connectRadius) continue;
-                if (!hub.CanAcceptConnection(threadCost)) continue;
-                result.Add((hub.parent, 0, distSq));
+                if (producer == null || producer.parent == null || !producer.parent.Spawned || producer.parent == excludeNode) continue;
+                if (!producer.IsOnline) continue;
+                float distSq = DistanceSquared(fromPos, producer.parent.Position);
+                if (distSq > producer.Props.connectRadius * producer.Props.connectRadius) continue;
+                if (!producer.CanAcceptConnection(threadCost)) continue;
+                result.Add((producer.parent, 0, distSq));
             }
             foreach (CelesIM_CompThreadRelay relay in relays)
             {
@@ -251,14 +251,14 @@ namespace CelesFeature
             var result = new List<(Thing node, int priority, float distSq)>();
             IntVec3 fromPos = requester.parent.Position;
             float selfRadius = requester.Props.connectRadius;
-            foreach (CelesIM_CompThreadProducer hub in hubs)
+            foreach (CelesIM_CompThreadProducer producer in producers)
             {
-                if (hub == null || hub.parent == null || !hub.parent.Spawned || hub.parent == excludeNode) continue;
-                if (!hub.IsOnline) continue;
-                float maxRadius = selfRadius > hub.Props.connectRadius ? selfRadius : hub.Props.connectRadius;
-                if (!fromPos.InHorDistOf(hub.parent.Position, maxRadius)) continue;
-                if (WouldCreateCycle(requester.parent, hub.parent)) continue;
-                result.Add((hub.parent, 0, fromPos.DistanceToSquared(hub.parent.Position)));
+                if (producer == null || producer.parent == null || !producer.parent.Spawned || producer.parent == excludeNode) continue;
+                if (!producer.IsOnline) continue;
+                float maxRadius = selfRadius > producer.Props.connectRadius ? selfRadius : producer.Props.connectRadius;
+                if (!fromPos.InHorDistOf(producer.parent.Position, maxRadius)) continue;
+                if (WouldCreateCycle(requester.parent, producer.parent)) continue;
+                result.Add((producer.parent, 0, fromPos.DistanceToSquared(producer.parent.Position)));
             }
             foreach (CelesIM_CompThreadRelay relay in relays)
             {
@@ -353,18 +353,18 @@ namespace CelesFeature
         }
 
         // ═══ 注册/注销（同步 O(1)；注销含节点消失级联——迁移路径，与超载级联断不同路）═══
-        // hub 注册/注销尾部触发干扰重算（存在数口径——E 批）
-        public void Notify_HubSpawned(CelesIM_CompThreadProducer hub)
+        // producer 注册/注销尾部触发干扰重算（存在数口径——E 批）
+        public void Notify_ProducerSpawned(CelesIM_CompThreadProducer producer)
         {
-            if (hub != null && !hubs.Contains(hub)) hubs.Add(hub);
+            if (producer != null && !producers.Contains(producer)) producers.Add(producer);
             RecalcInterference();
         }
 
-        public void Notify_HubDespawned(CelesIM_CompThreadProducer hub)
+        public void Notify_ProducerDespawned(CelesIM_CompThreadProducer producer)
         {
-            if (hub == null) return;
-            hubs.Remove(hub);
-            CascadeChildrenLost(hub.parent);
+            if (producer == null) return;
+            producers.Remove(producer);
+            CascadeChildrenLost(producer.parent);
             RecalcInterference();
         }
 
@@ -400,29 +400,29 @@ namespace CelesFeature
         public void RecalcInterference()
         {
             CelesIM_CompThreadProducer active = ActiveCore;
-            foreach (CelesIM_CompThreadProducer hub in hubs)
+            foreach (CelesIM_CompThreadProducer producer in producers)
             {
-                if (hub == null || hub.parent == null || !hub.parent.Spawned) continue;
-                bool shouldStop = hub != active;
-                if (shouldStop && !hub.IsShutdownByInterference)
-                    hub.SetInterferenceShutdown(true);
-                else if (!shouldStop && hub.IsShutdownByInterference)
+                if (producer == null || producer.parent == null || !producer.parent.Spawned) continue;
+                bool shouldStop = producer != active;
+                if (shouldStop && !producer.IsShutdownByInterference)
+                    producer.SetInterferenceShutdown(true);
+                else if (!shouldStop && producer.IsShutdownByInterference)
                 {
-                    hub.SetInterferenceShutdown(false);
-                    hub.TryAutoWake();
+                    producer.SetInterferenceShutdown(false);
+                    producer.TryAutoWake();
                 }
             }
         }
 
         // 故障中枢清单（WorkGiver 数据源——注册表过滤，零全图扫描）
-        public List<Thing> FaultedHubsForReading
+        public List<Thing> FaultedProducersForReading
         {
             get
             {
                 var list = new List<Thing>();
-                foreach (CelesIM_CompThreadProducer hub in hubs)
-                    if (hub != null && hub.parent != null && hub.parent.Spawned && hub.FaultActive)
-                        list.Add(hub.parent);
+                foreach (CelesIM_CompThreadProducer producer in producers)
+                    if (producer != null && producer.parent != null && producer.parent.Spawned && producer.FaultActive)
+                        list.Add(producer.parent);
                 return list;
             }
         }
@@ -468,11 +468,11 @@ namespace CelesFeature
         {
             if (!poweredOn || thing == null)
                 return;
-            CelesIM_CompThreadProducer hub = thing.TryGetComp<CelesIM_CompThreadProducer>();
-            if (hub != null)
+            CelesIM_CompThreadProducer producer = thing.TryGetComp<CelesIM_CompThreadProducer>();
+            if (producer != null)
             {
-                if (hub.IsOnline)
-                    hub.TryAutoWake();   // 抑制消费点 3
+                if (producer.IsOnline)
+                    producer.TryAutoWake();   // 抑制消费点 3
                 return;
             }
             CelesIM_CompThreadConsumer consumer = thing.TryGetComp<CelesIM_CompThreadConsumer>();
@@ -494,8 +494,8 @@ namespace CelesFeature
 
         public override void MapComponentTick()
         {
-            for (int i = 0; i < hubs.Count; i++)
-                hubs[i]?.TickOverload();
+            for (int i = 0; i < producers.Count; i++)
+                producers[i]?.TickOverload();
             // 批 2：预热三态递减（活跃连接且 remaining>0 → 递减；无信号冻结；断联清零由 Sever/Disconnect 覆盖）
             for (int i = 0; i < consumers.Count; i++)
                 consumers[i]?.TickWarmup();
@@ -505,12 +505,12 @@ namespace CelesFeature
 
         public override void FinalizeInit()
         {
-            hubs.Clear(); relays.Clear(); consumers.Clear();
+            producers.Clear(); relays.Clear(); consumers.Clear();
             List<Building> buildings = map.listerBuildings.allBuildingsColonist;
             for (int i = 0; i < buildings.Count; i++)
             {
-                CelesIM_CompThreadProducer hub = buildings[i].TryGetComp<CelesIM_CompThreadProducer>();
-                if (hub != null) { hubs.Add(hub); continue; }
+                CelesIM_CompThreadProducer producer = buildings[i].TryGetComp<CelesIM_CompThreadProducer>();
+                if (producer != null) { producers.Add(producer); continue; }
                 CelesIM_CompThreadRelay relay = buildings[i].TryGetComp<CelesIM_CompThreadRelay>();
                 if (relay != null) { relays.Add(relay); continue; }
                 CelesIM_CompThreadConsumer consumer = buildings[i].TryGetComp<CelesIM_CompThreadConsumer>();
@@ -561,7 +561,7 @@ namespace CelesFeature
 
         public string DebugString()
         {
-            return $"[CelesIM] ThreadNetwork: hubs={hubs.Count} relays={relays.Count} consumers={consumers.Count} " +
+            return $"[CelesIM] ThreadNetwork: producers={producers.Count} relays={relays.Count} consumers={consumers.Count} " +
                    $"activeCore={ActiveCore?.parent.LabelCap ?? "无"} bindings(c2n)={consumerToNode.Count} (r2p)={relayToParent.Count}";
         }
     }

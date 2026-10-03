@@ -23,7 +23,7 @@ namespace CelesFeature
     }
 
     // 中枢（E+F 批 2026-09-13：干扰存在数化[管理器重算] + 自定义中枢故障子系统 + 抑制算法）
-    //   故障：唯一来源 = 超载倒计时归零；维修 = CelesIM_JobDriver_FixHubFault（资源/时长 XML 配置）
+    //   故障：唯一来源 = 超载倒计时归零；维修 = CelesIM_JobDriver_FixProducerFault（资源/时长 XML 配置）
     //   抑制算法（完整版见批1执行要点）：
     //     置位唯一路径 = 维修完成且当时无电；消费唯一路径 = TryAutoWake（上电/干扰恢复两入口）；
     //     新超载周期防御性清位；拆除重建不跨实体；两字段随档
@@ -48,7 +48,37 @@ namespace CelesFeature
         Color CelesIM_IThreadNode.PipColor => ColorLibrary.Yellow;
         string CelesIM_IThreadNode.GizmoLabel => "CelesIM_Keyed_GizmoThreads".Translate();
         public int TotalCapacity =>
-            (isShutdownByInterference || faultActive) ? 0 : Mathf.Max(0, Props.baseThreadsProduce + capacityOffset + devCapacityOffset);
+            (isShutdownByInterference || faultActive) ? 0 : Mathf.Max(0, Props.baseThreadsProduce + capacityOffset + devCapacityOffset + ProducerBuffOffset);
+
+        // 批 6 B（D41 Producer Effect）：中枢增幅器产出增益——无状态现算（读确认链接零遍历，
+        // 免订阅/退订/存档一致性；capacityOffset 系持久字段留给 DEV）。不走 stat（中枢产出非
+        // stat 化）——计入 TotalCapacity 后中枢 Inspect 产出行/Gizmo 方格/负载率/过载链全部
+        // 自动直显（用户修正②）。断电增幅器由原版 CompFacility.CanBeActive 判失活（挂
+        // PowerTrader 断电即 false）——「仅耗电」语义；纯 facility 直连（不经中继——修正①）。
+        // 重算时机：无缓存依赖（TotalCapacity 每查现算）。
+        private int ProducerBuffOffset
+        {
+            get
+            {
+                CompAffectedByFacilities aff = parent?.GetComp<CompAffectedByFacilities>();
+                if (aff == null)
+                {
+                    return 0;
+                }
+                List<Thing> linked = aff.LinkedFacilitiesListForReading;
+                int sum = 0;
+                for (int i = 0; i < linked.Count; i++)
+                {
+                    CompFacility fac = linked[i]?.TryGetComp<CompFacility>();
+                    if (fac == null || !fac.CanBeActive)
+                    {
+                        continue;
+                    }
+                    sum += linked[i].def.GetModExtension<CelesIM_AmplifierExt>()?.boostPerUnit ?? 0;
+                }
+                return sum;
+            }
+        }
         public int CurrentLoad => Mgr != null ? Mgr.LoadOf(parent) : 0;
         // 批 2：无信号段负载（Gizmo 嵌套格数据源——IThreadNode）
         public int NoSignalLoad
@@ -205,7 +235,7 @@ namespace CelesFeature
         {
             // 子级级联（解绑+迁移重试）与干扰重算由管理器 Deregister 处理
             CelesIM_ThreadNetworkManager mgr = map != null ? CelesIM_ThreadNetworkManager.For(map) : null;
-            mgr?.Notify_HubDespawned(this);
+            mgr?.Notify_ProducerDespawned(this);
             base.PostDeSpawn(map, mode);
         }
         // ============================================================
@@ -289,7 +319,7 @@ namespace CelesFeature
             base.PostSpawnSetup(respawningAfterLoad);
             powerComp = parent.GetComp<CompPowerTrader>();
             if (Mgr != null)
-                Mgr.Notify_HubSpawned(this);   // 注册 + 干扰重算（新 hub 必为最大 thingIDNumber → 后来者停机）
+                Mgr.Notify_ProducerSpawned(this);   // 注册 + 干扰重算（新 producer 必为最大 thingIDNumber → 后来者停机）
             if (!respawningAfterLoad)
                 overloadTimer = 0;
         }
@@ -332,19 +362,19 @@ namespace CelesFeature
         public override string CompInspectStringExtra()
         {
             if (isShutdownByInterference)
-                return "CelesIM_Keyed_HubInspectInterference".Translate();
+                return "CelesIM_Keyed_ProducerInspectInterference".Translate();
             if (faultActive)
-                return "CelesIM_Keyed_HubInspectFault".Translate();
+                return "CelesIM_Keyed_ProducerInspectFault".Translate();
             if (IsOverloaded)
             {
                 if (!IsOnline)
-                    return "CelesIM_Keyed_HubInspectOverloadOffline".Translate(TotalCapacity, CurrentLoad, LoadRate.ToStringPercent());
+                    return "CelesIM_Keyed_ProducerInspectOverloadOffline".Translate(TotalCapacity, CurrentLoad, LoadRate.ToStringPercent());
                 // 批 2 修正：计时走原版统一格式化器 GenDate.ToStringTicksToPeriod（:254——秒/小时/天自适应，官方 Period* 键族零硬编码）
                 int timer = overloadTimer > 0 ? overloadTimer : Props.overloadCount;
-                return "CelesIM_Keyed_HubInspectOverloadCountdown".Translate(TotalCapacity, CurrentLoad,
+                return "CelesIM_Keyed_ProducerInspectOverloadCountdown".Translate(TotalCapacity, CurrentLoad,
                     LoadRate.ToStringPercent(), timer.ToStringTicksToPeriod());
             }
-            return "CelesIM_Keyed_HubInspectNormal".Translate(TotalCapacity, CurrentLoad, LoadRate.ToStringPercent());
+            return "CelesIM_Keyed_ProducerInspectNormal".Translate(TotalCapacity, CurrentLoad, LoadRate.ToStringPercent());
         }
     }
 }

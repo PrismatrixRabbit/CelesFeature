@@ -52,10 +52,10 @@ namespace CelesFeature
             List<(Thing node, int priority, bool inRange, float distSq, bool canAccept, float ringRadius)>
                 items = new List<(Thing, int, bool, float, bool, float)>();
 
-            List<CelesIM_CompThreadProducer> hubs = mgr.HubsForReading;
-            for (int i = 0; i < hubs.Count; i++)
+            List<CelesIM_CompThreadProducer> producers = mgr.ProducersForReading;
+            for (int i = 0; i < producers.Count; i++)
             {
-                CelesIM_CompThreadProducer producer = hubs[i];
+                CelesIM_CompThreadProducer producer = producers[i];
                 if (producer == null || producer.parent == null)
                     continue;
                 Thing node = producer.parent;
@@ -133,10 +133,10 @@ namespace CelesFeature
                 items = new List<(Thing, int, bool, float, bool, float)>();
             float selfRadius = props.connectRadius;
 
-            List<CelesIM_CompThreadProducer> hubs = mgr.HubsForReading;
-            for (int i = 0; i < hubs.Count; i++)
+            List<CelesIM_CompThreadProducer> producers = mgr.ProducersForReading;
+            for (int i = 0; i < producers.Count; i++)
             {
-                CelesIM_CompThreadProducer producer = hubs[i];
+                CelesIM_CompThreadProducer producer = producers[i];
                 if (producer == null || producer.parent == null)
                     continue;
                 Thing node = producer.parent;

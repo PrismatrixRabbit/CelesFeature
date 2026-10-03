@@ -4,9 +4,9 @@ using RimWorld;
 
 namespace CelesFeature
 {
-    public class CelesIM_Alert_HubInterference : Alert
+    public class CelesIM_Alert_ProducerInterference : Alert
     {
-        public CelesIM_Alert_HubInterference()
+        public CelesIM_Alert_ProducerInterference()
         {
             defaultLabel = "CelesIM_Keyed_AlertInterferenceLabel".Translate();
             defaultExplanation = "CelesIM_Keyed_AlertInterferenceDesc".Translate();
@@ -20,10 +20,10 @@ namespace CelesFeature
             for (int i = 0; i < maps.Count; i++)
             {
                 // G 批：数据源 = 管理器注册表——判定语义不变
-                List<CelesIM_CompThreadProducer> hubs = CelesIM_ThreadNetworkManager.For(maps[i]).HubsForReading;
-                for (int j = 0; j < hubs.Count; j++)
+                List<CelesIM_CompThreadProducer> producers = CelesIM_ThreadNetworkManager.For(maps[i]).ProducersForReading;
+                for (int j = 0; j < producers.Count; j++)
                 {
-                    CelesIM_CompThreadProducer producer = hubs[j];
+                    CelesIM_CompThreadProducer producer = producers[j];
                     if (producer != null && producer.parent != null && producer.IsShutdownByInterference)
                         culprits.Add(producer.parent);
                 }

@@ -6,10 +6,10 @@ using RimWorld;
 namespace CelesFeature
 {
     // 中枢故障维修 WorkGiver（E+F 批 2026-09-13；2026-09-20 修复多堆装配）
-    //   复刻 WorkGiver_FixBrokenDownBuilding.cs:7-93 守卫族 + 数据源 = 管理器注册表（FaultedHubsForReading）；
+    //   复刻 WorkGiver_FixBrokenDownBuilding.cs:7-93 守卫族 + 数据源 = 管理器注册表（FaultedProducersForReading）；
     //   多堆凑数装配 = ResourceDeliverJobFor.cs:226-256 装配算法的单 def 化（验证器回归原版三条件——
     //   无单堆数量要求；原 bug 根因 = 验证器误加 stackCount >= count 致 2×1 堆判无资源）
-    public class CelesIM_WorkGiver_FixHubFault : WorkGiver_Scanner
+    public class CelesIM_WorkGiver_FixProducerFault : WorkGiver_Scanner
     {
         public override ThingRequest PotentialWorkThingRequest => ThingRequest.ForGroup(ThingRequestGroup.BuildingArtificial);
 
@@ -17,12 +17,12 @@ namespace CelesFeature
 
         public override IEnumerable<Thing> PotentialWorkThingsGlobal(Pawn pawn)
         {
-            return CelesIM_ThreadNetworkManager.For(pawn.Map).FaultedHubsForReading;
+            return CelesIM_ThreadNetworkManager.For(pawn.Map).FaultedProducersForReading;
         }
 
         public override bool ShouldSkip(Pawn pawn, bool forced = false)
         {
-            return CelesIM_ThreadNetworkManager.For(pawn.Map).FaultedHubsForReading.Count == 0;
+            return CelesIM_ThreadNetworkManager.For(pawn.Map).FaultedProducersForReading.Count == 0;
         }
 
         public override Danger MaxPathDanger(Pawn pawn)
@@ -38,10 +38,10 @@ namespace CelesFeature
                 return false;
             if (t.Faction != pawn.Faction)
                 return false;
-            CelesIM_CompThreadProducer hub = building.TryGetComp<CelesIM_CompThreadProducer>();
-            if (hub == null || !hub.FaultActive)
+            CelesIM_CompThreadProducer producer = building.TryGetComp<CelesIM_CompThreadProducer>();
+            if (producer == null || !producer.FaultActive)
                 return false;
-            if (hub.Props.faultRepairResource == null || hub.Props.faultRepairCount < 1)
+            if (producer.Props.faultRepairResource == null || producer.Props.faultRepairCount < 1)
                 return false;   // 未配置维修资源的 def 不提供维修 Job
             if (pawn.Faction == Faction.OfPlayer && !pawn.Map.areaManager.Home[t.Position])
             {
@@ -54,7 +54,7 @@ namespace CelesFeature
                 return false;
             if (building.IsBurning())
                 return false;
-            if (!TryAssembleRepairResources(pawn, hub.Props.faultRepairResource, hub.Props.faultRepairCount, out _, out _))
+            if (!TryAssembleRepairResources(pawn, producer.Props.faultRepairResource, producer.Props.faultRepairCount, out _, out _))
             {
                 JobFailReason.Is("CelesIM_Keyed_NoFaultResource".Translate());
                 return false;
@@ -64,9 +64,9 @@ namespace CelesFeature
 
         public override Job JobOnThing(Pawn pawn, Thing t, bool forced = false)
         {
-            CelesIM_CompThreadProducer hub = t.TryGetComp<CelesIM_CompThreadProducer>();
-            Job job = JobMaker.MakeJob(CelesIM_DefOf.CelesIM_FixHubFault, t);
-            TryAssembleRepairResources(pawn, hub.Props.faultRepairResource, hub.Props.faultRepairCount,
+            CelesIM_CompThreadProducer producer = t.TryGetComp<CelesIM_CompThreadProducer>();
+            Job job = JobMaker.MakeJob(CelesIM_DefOf.CelesIM_FixProducerFault, t);
+            TryAssembleRepairResources(pawn, producer.Props.faultRepairResource, producer.Props.faultRepairCount,
                 out List<Thing> stacks, out List<int> shares);
             // 全堆入队（含首堆）+ 份额对齐——ExtractNextTargetFromQueue 逐项弹出并同步 job.count
             //（Toils_JobTransforms.cs:28-33 实证：读的是单一 job.countQueue，与被出队队列配对；镜像 DoBill 装配）
@@ -74,7 +74,7 @@ namespace CelesFeature
             for (int i = 0; i < stacks.Count; i++)
                 job.targetQueueB.Add(stacks[i]);
             job.countQueue = shares;
-            job.count = hub.Props.faultRepairCount;
+            job.count = producer.Props.faultRepairCount;
             return job;
         }
 

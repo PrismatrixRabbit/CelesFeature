@@ -82,6 +82,16 @@ namespace CelesFeature
 
         public Pawn BoundPawn => boundPawn;
 
+        // ═══ 批 6 D36：星铃调频（2026-10-03）═══
+        // 操作 pawn=星铃 race → 本订单尘构机效率 ×1.2（bill 生命周期内有效，取出/终止即 Reset 消失）。
+        // 落点（D40）：不走 WorkSpeedMultiplier 直乘——旗标由此处单点维护，乘法在
+        // CelesIM_StatPart_StarlinkTuning（Celes_ThreadLinkEfficiency parts），速度/ETA/InfoCard 全链自动跟随。
+        private bool starlinkTuning;
+
+        public const float StarlinkTuningFactor = 1.2f;   // 临时修订常量（替代挂起的 U3 门准入；正式化时 XML 化）
+
+        public bool StarlinkTuningActive => starlinkTuning;   // StatPart_StarlinkTuning 消费（经建筑 ActiveBill）
+
         // 绑定开关解析（last-wins 同 FormingGraphicExt 模式；判别器双闸=仅 b 模型可绑）
         private bool BindOperatorEnabled => ProducesPawn(recipe)
             && recipe.modExtensions?.OfType<CelesIM_PawnProductExt>().LastOrDefault()?.bindOperator == true;
@@ -101,6 +111,11 @@ namespace CelesFeature
             if (boundPawn != billDoer)
             {
                 boundPawn = billDoer;
+            }
+            // D36 星铃调频：仅置位不清（生命周期语义——非星铃操作者接手不撤销，唯 Reset 消失）
+            if (billDoer != null && billDoer.def == CelesIM_DefOf.Celes_Race)
+            {
+                starlinkTuning = true;
             }
         }
 
@@ -201,6 +216,7 @@ namespace CelesFeature
             base.Reset();
             cyclesDone = 0;
             boundPawn = null;
+            starlinkTuning = false;   // D36：订单取出（Notify_IterationCompleted→Reset）/终止→乘数消失
         }
 
         // ═══ U2 修订（D32）：按母本 Bill_ProductionMech.AppendInspectionData（:29-51）结构重构 ═══
@@ -268,6 +284,7 @@ namespace CelesFeature
             base.ExposeData();
             Scribe_Values.Look(ref cyclesDone, "cyclesDone", 0);
             Scribe_References.Look(ref boundPawn, "boundPawn");   // 母本 :182 同款
+            Scribe_Values.Look(ref starlinkTuning, "starlinkTuning", false);   // D36：存档保持
         }
     }
 

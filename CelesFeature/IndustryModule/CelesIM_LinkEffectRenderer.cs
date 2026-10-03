@@ -55,9 +55,9 @@ namespace CelesFeature
         // Q3 B：节点连点 z+ 偏移（伪 3D 视觉高度——中枢~5 / 中继~1.2，按贴图顶端实测定稿）
         public static float LinkHeightOf(Thing node)
         {
-            CelesIM_CompThreadProducer hub = node.TryGetComp<CelesIM_CompThreadProducer>();
-            if (hub != null)
-                return hub.Props.linkHeight;
+            CelesIM_CompThreadProducer producer = node.TryGetComp<CelesIM_CompThreadProducer>();
+            if (producer != null)
+                return producer.Props.linkHeight;
             CelesIM_CompThreadRelay relay = node.TryGetComp<CelesIM_CompThreadRelay>();
             if (relay != null)
                 return relay.Props.linkHeight;

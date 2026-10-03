@@ -36,6 +36,8 @@ namespace CelesFeature
         }
 
         // bill 创建唯一生产口（ITab_Bills.cs:114）；precept 透传（Ideo 风格变体加单兼容）
+        // U2 修订（D32）：曾在此追加绑定配方挂单弹窗——已删（配方配 mechanitorOnlyRecipe 后，
+        // 原版 ITab_Bills.cs:106-109 条件弹窗[地图无空闲机械师时]免费接管，含原版官方文案）
         public static void Postfix(RecipeDef recipe, Precept_ThingStyle precept, ref Bill __result)
         {
             if (AutoProducerRecipes.Contains(recipe))

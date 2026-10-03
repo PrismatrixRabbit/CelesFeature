@@ -18,8 +18,14 @@ namespace CelesFeature
     //  · U1 不落（按单元生长）：GetGizmos/GetFloatMenuOptions（U4）；ExposeData（零新增）；
     //    Notify_FormingCompleted 的 byproduct 钩子（U5 在现有覆写的 base 调用后追加）
     // ════════════════════════════════════════════════════════════════
+    [StaticConstructorOnStartup]   // U2 增补：进度条材质静态构造时机（母本 Building_MechGestator:9 同款）
     public class CelesIM_Building_AutoProducer : Building_WorkTableAutonomous
     {
+        // U2 增补（D31）：锻造进度条材质（母本 :24-26 形态；填充色=线程主题蓝——用户裁决 10-02，
+        // 底图全透明同母本=仅填充段可见）
+        private static Material ForgeBarFilledMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0.4f, 0.7f, 1.0f));
+
+        private static Material ForgeBarUnfilledMat = SolidColorMaterials.SimpleSolidColorMaterial(new Color(0f, 0f, 0f, 0f));
         [Unsaved] private CompPowerTrader powerComp;      // 基类 powerComp 为 private（Building_WorkTable.cs:10）——自缓存
         [Unsaved] private CelesIM_CompThreadConsumer threadComp;
         [Unsaved] private Sustainer workingSound;         // Forming 周期环境音（母本 :14 同位）
@@ -42,6 +48,13 @@ namespace CelesFeature
             {
                 return false;   // 依赖型断连——与 bill 双闸 patch 同一单点（Consumer 属性，值义 1=依赖）
             }
+            // U2 增补（D31）：绑定者死亡=冻结（原版 BoundPawnStateAllowsForming :56-66 意图同款；
+            // 落 CanWork 单闸=与断电/断连同构的统一冻结语言[计时停+流光停+电力回落+音停]——
+            // 偏离原版细节[电仍满载/音仍响]已报备。解冻出口=删单[Reset 清绑定+原料弹出]）
+            if (activeBill is CelesIM_Bill_AutoProducer bill && bill.BindingBroken)
+            {
+                return false;
+            }
             return true;
         }
 
@@ -63,6 +76,27 @@ namespace CelesFeature
         // 容器内活体 Pawn（母本 GestatingMech :68-79 同款，去复活 Corpse 支路）——
         // b 模型 Formed 后产物所在；提取路由 patch（Patch_GenRecipe_PawnRoute）与 DrawAt 序0 双消费
         public Pawn GestatingPawn => innerContainer.FirstOrDefault((Thing t) => t is Pawn) as Pawn;
+
+        // ═══ U2 修订（D32）：DEV 工具补齐——母本增量件「Complete all cycles」═══
+        // 基类 GetGizmos（Building_WorkTableAutonomous:140-163）自带 Forming 态两件（+25%/Complete
+        // cycle 单周期）——多周期配方 Preparing 态无 DEV、无一步完成；母本 :272-278 增量件=全部
+        // 周期一步完成（ForceCompleteAllCycles：置满 cyclesDone+formingTicks=0→下一 tick 即 Formed）
+        public override IEnumerable<Gizmo> GetGizmos()
+        {
+            foreach (Gizmo gizmo in base.GetGizmos())
+            {
+                yield return gizmo;
+            }
+            if (DebugSettings.ShowDevGizmos && activeBill is CelesIM_Bill_AutoProducer bill
+                && bill.State != FormingState.Gathering && bill.State != FormingState.Formed)
+            {
+                yield return new Command_Action
+                {
+                    action = bill.ForceCompleteAllCycles,
+                    defaultLabel = "DEV: Complete all cycles"
+                };
+            }
+        }
 
         // ═══ 培育器音频模式五件套（母本 Building_MechGestator:105-188；Biotech def null 守卫=无 DLC 静默降级）═══
 
@@ -142,7 +176,8 @@ namespace CelesFeature
                 return;
             }
             CelesIM_FormingGraphicExt ext = ResolveContentExt();
-            Graphic content = ResolveFormedGraphic(ext) ?? ResolveContentGraphic(ext);
+            Graphic formedGraphic = ResolveFormedGraphic(ext);          // 序0：容器内 Pawn 本体图（Multi 真变体族）
+            Graphic content = formedGraphic ?? ResolveContentGraphic(ext);   // 其余：ext 三态图
             if (content == null)
             {
                 return;
@@ -153,7 +188,30 @@ namespace CelesFeature
             {
                 loc.z += Mathf.PingPong(Find.TickManager.TicksGame * ext.bobSpeed, ext.bobDistance);   // 母本 PingPong 同款（z 浮动）
             }
-            content.Draw(loc, Rot4.South, this);
+            // ═══ 绘制制（10-02 用户裁定 Content 同病后统一）：ext 图=恒 North 基准+extraRotation 显式 ═══
+            // （原恒 South+Single=恒转 180°且不随建筑——与状态灯同病同源，修法同参 CompStatusLight 注释：
+            // North 基准绕开 flip/offset/ShouldDrawRotated 全部实装魔法，extra 单变量=画布刚体旋转跟随建筑）；
+            // 本体图（序0，Graphic_Multi 真变体族）走材质选择制=Draw(实际朝向)。
+            float extraRot = base.Rotation.AsAngle - Rot4.South.AsAngle;   // 符号=10-02 四向实测标定（同 CompStatusLight）
+            if (formedGraphic != null)
+            {
+                formedGraphic.Draw(loc, base.Rotation, this);
+            }
+            else
+            {
+                content.Draw(loc, Rot4.North, this, extraRot);
+            }
+            // ── U2 增补（D31）：锻造进度条（母本 :217-223 同款五件套）──
+            // 进度语义=当前周期（原版 CurrentBillFormingPercent 同源：State!=Forming→0——多周期每周期
+            // 0→100 回卷、Preparing 归零条消失）；FillableBarRequest 为 struct 赋值拷贝=免共享污染；
+            // 底图全透明=仅填充段可见（fillPercent≤0.001 时填充段也不画，GenDraw :629）
+            GenDraw.FillableBarRequest barDrawData = base.BarDrawData;   // 基类现成属性（:41→def.building.BarDrawDataFor）
+            barDrawData.center = drawLoc;
+            barDrawData.fillPercent = CurrentBillFormingPercent;
+            barDrawData.filledMat = ForgeBarFilledMat;
+            barDrawData.unfilledMat = ForgeBarUnfilledMat;
+            barDrawData.rotation = base.Rotation;
+            GenDraw.DrawFillableBar(barDrawData);
         }
 
         // 序0：容器含 Pawn → 自动本体图（方案 A 裁决 10-02）。守卫限值取 ext.maxFormedDrawSize

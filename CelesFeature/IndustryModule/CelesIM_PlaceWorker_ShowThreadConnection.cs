@@ -73,12 +73,12 @@ namespace CelesFeature
                 if (relay == null || relay.parent == null)
                     continue;
                 Thing node = relay.parent;
-                bool inRange = loc.InHorDistOf(node.Position, relay.Props.connectRadius);
+                bool inRange = loc.InHorDistOf(node.Position, relay.EffectiveConnectRadius);
                 // 与旧全图版逐行等价：此处不查 IsAccessible（预览与 TryConnect 的既有差异，等价迁移保留）
                 bool canAccept = inRange && relay.IsOnline
                     && relay.ConnectionCount < relay.TotalCapacity;
                 float distSq = loc.DistanceToSquared(node.Position);
-                items.Add((node, 1, inRange, distSq, canAccept, relay.Props.connectRadius));
+                items.Add((node, 1, inRange, distSq, canAccept, relay.EffectiveConnectRadius));
             }
 
             if (items.Count == 0)
@@ -154,12 +154,12 @@ namespace CelesFeature
                 if (relay == null || relay.parent == null)
                     continue;
                 Thing node = relay.parent;
-                float maxRadius = Mathf.Max(selfRadius, relay.Props.connectRadius);
+                float maxRadius = Mathf.Max(selfRadius, relay.EffectiveConnectRadius);
                 bool inRange = loc.InHorDistOf(node.Position, maxRadius);
                 bool canAccept = inRange && relay.IsOnline
                     && relay.ConnectionCount < relay.TotalCapacity;
                 float distSq = loc.DistanceToSquared(node.Position);
-                items.Add((node, 1, inRange, distSq, canAccept, relay.Props.connectRadius));
+                items.Add((node, 1, inRange, distSq, canAccept, relay.EffectiveConnectRadius));
             }
 
             if (items.Count == 0)

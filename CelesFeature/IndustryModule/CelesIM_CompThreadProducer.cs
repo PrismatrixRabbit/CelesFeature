@@ -60,23 +60,9 @@ namespace CelesFeature
         {
             get
             {
-                CompAffectedByFacilities aff = parent?.GetComp<CompAffectedByFacilities>();
-                if (aff == null)
-                {
-                    return 0;
-                }
-                List<Thing> linked = aff.LinkedFacilitiesListForReading;
-                int sum = 0;
-                for (int i = 0; i < linked.Count; i++)
-                {
-                    CompFacility fac = linked[i]?.TryGetComp<CompFacility>();
-                    if (fac == null || !fac.CanBeActive)
-                    {
-                        continue;
-                    }
-                    sum += linked[i].def.GetModExtension<CelesIM_AmplifierExt>()?.boostPerUnit ?? 0;
-                }
-                return sum;
+                // 批 7（D45）：改经聚合 helper——直挂 + 协调器托管一层（扩容枢纽加成回流）。
+                // 活跃门/嵌套遍历单源化（CelesIM_ProducerDeviceUtility），电力链同用此源。
+                return CelesIM_ProducerDeviceUtility.TotalBoost(parent);
             }
         }
         public int CurrentLoad => Mgr != null ? Mgr.LoadOf(parent) : 0;

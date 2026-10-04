@@ -12,6 +12,9 @@ namespace CelesFeature
         public float connectRadius = 7.9f;
         public bool defaultAccessible = true;
 
+        // 批 7 P5：仅转发（可接入禁用）时的连接范围加成（XML 可配；0=现行为不变）
+        public float forwardOnlyRadiusBonus = 0f;
+
         // ── 批 3 B3：常显连线特效（数值占位实测定稿——XML 可调，不写则用默认）──
         public float linkHeight = 0f;                                   // Q3 B：本端连点 z+ 偏移（伪 3D 视觉高度；中枢~5/中继~1.2）
         public float lineWidth = 0.12f;                                 // Q2：线宽（世界单位；0.35 实测过宽缩 2/3）
@@ -81,6 +84,10 @@ namespace CelesFeature
         }
         public bool IsConnectedToParent => Mgr != null && Mgr.IsBoundToParent(parent);
         public bool IsAccessible => accessibleMode;
+
+        // 批 7 P5：有效连接半径单点——仅转发时 connectRadius + 加成（显示环/上行/候选中继全走此值）
+        public float EffectiveConnectRadius =>
+            Props.connectRadius + (accessibleMode ? 0f : Props.forwardOnlyRadiusBonus);
         // 活跃 = 本机有电 ∧ 上行绑定 ∧ 父链通（E 批：中继自检干扰机制删除——干扰=中枢停机，唯一机制）
         public bool IsOnline => HasPowerNow && (Mgr != null && Mgr.IsActiveRelay(this));
         // 「无信号」派生（上行绑定保留·链路不通）——保留旧属性名（Q7）
@@ -121,7 +128,7 @@ namespace CelesFeature
         // ============================================================
         public void DrawSubtreeRangeRings()
         {
-            GenDraw.DrawRadiusRing(parent.Position, Props.connectRadius, CelesIM_PlaceWorker_ShowThreadConnection.DimRingColor);
+            GenDraw.DrawRadiusRing(parent.Position, EffectiveConnectRadius, CelesIM_PlaceWorker_ShowThreadConnection.DimRingColor);
             List<Thing> children = Mgr?.GetDirectChildren(parent);
             if (children == null) return;
             for (int i = 0; i < children.Count; i++)
@@ -215,7 +222,7 @@ namespace CelesFeature
 
         public override void PostDrawExtraSelectionOverlays()
         {
-            GenDraw.DrawRadiusRing(parent.Position, Props.connectRadius);
+            GenDraw.DrawRadiusRing(parent.Position, EffectiveConnectRadius);
 
             Thing parentNode = Mgr?.GetRelayParent(parent);
             if (IsConnectedToParent && parentNode != null)
@@ -393,7 +400,7 @@ namespace CelesFeature
                 CelesIM_CompThreadConsumer consumer = consumers[i];
                 if (consumer == null || consumer.parent == null)
                     continue;
-                if (!parent.Position.InHorDistOf(consumer.parent.Position, Props.connectRadius))
+                if (!parent.Position.InHorDistOf(consumer.parent.Position, EffectiveConnectRadius))
                     continue;
                 if (!consumer.IsConnected)
                     consumer.TryConnect();

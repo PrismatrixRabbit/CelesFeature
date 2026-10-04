@@ -235,7 +235,7 @@ namespace CelesFeature
                 if (relay == null || relay.parent == null || !relay.parent.Spawned || relay.parent == excludeNode) continue;
                 if (!relay.IsOnline || !relay.IsAccessible) continue;
                 float distSq = DistanceSquared(fromPos, relay.parent.Position);
-                if (distSq > relay.Props.connectRadius * relay.Props.connectRadius) continue;
+                if (distSq > relay.EffectiveConnectRadius * relay.EffectiveConnectRadius) continue;
                 if (relay.ConnectionCount >= relay.TotalCapacity) continue;
                 result.Add((relay.parent, 1, distSq));
             }
@@ -250,7 +250,7 @@ namespace CelesFeature
         {
             var result = new List<(Thing node, int priority, float distSq)>();
             IntVec3 fromPos = requester.parent.Position;
-            float selfRadius = requester.Props.connectRadius;
+            float selfRadius = requester.EffectiveConnectRadius;
             foreach (CelesIM_CompThreadProducer producer in producers)
             {
                 if (producer == null || producer.parent == null || !producer.parent.Spawned || producer.parent == excludeNode) continue;
@@ -265,7 +265,7 @@ namespace CelesFeature
                 if (relay == null || relay.parent == null || !relay.parent.Spawned || relay.parent == excludeNode) continue;
                 if (!relay.IsOnline) continue;
                 if (relay.ConnectionCount >= relay.TotalCapacity) continue;
-                float maxRadius = selfRadius > relay.Props.connectRadius ? selfRadius : relay.Props.connectRadius;
+                float maxRadius = selfRadius > relay.EffectiveConnectRadius ? selfRadius : relay.EffectiveConnectRadius;
                 if (!fromPos.InHorDistOf(relay.parent.Position, maxRadius)) continue;
                 if (WouldCreateCycle(requester.parent, relay.parent)) continue;
                 result.Add((relay.parent, 1, fromPos.DistanceToSquared(relay.parent.Position)));

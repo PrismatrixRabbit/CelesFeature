@@ -191,6 +191,24 @@ namespace CelesFeature
             Mgr?.UnbindConsumer(this);
         }
 
+        // 批 7 D44：设备开关联动入口（ProducerDevice 族 SetSwitch 调用——平衡器双身份单一门）
+        public void SetSwitch(bool on)
+        {
+            if (wantSwitchOn == on)
+            {
+                return;
+            }
+            wantSwitchOn = on;
+            if (on)
+            {
+                TryConnect();
+            }
+            else
+            {
+                Disconnect();
+            }
+        }
+
         public void ResetConnection()
         {
             wantSwitchOn = true;   // 重置即复位手动断开守卫（重新允许连接）
@@ -204,6 +222,12 @@ namespace CelesFeature
         // ── Gizmo ──
         public override IEnumerable<Gizmo> CompGetGizmosExtra()
         {
+            // 批 7 D44：本机挂 ProducerDevice 族（中枢调整设备）时——开关/重置统一由设备侧提供，
+            // 此处整体让步（避免同机双开关；平衡器双身份单一门=ProducerDevice 开关联动本 comp）
+            if (parent.GetComp<CelesIM_CompFacility_ProducerDevice>() != null)
+            {
+                yield break;
+            }
             // 启用线程连接开关（2026-09-23：镜像可接入 toggle 形状——Command_Toggle 范式
             // CompRefuelable.cs:356-371；isActive=连接意愿而非实际连接）
             yield return new Command_Toggle

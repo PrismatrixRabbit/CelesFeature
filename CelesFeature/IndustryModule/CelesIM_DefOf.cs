@@ -28,5 +28,14 @@ namespace CelesFeature
 
         // 批 6 D36：星铃 race（Race_Celes.xml——星铃调频乘数的操作者判定）
         public static ThingDef Celes_Race;
+
+        // 批 7：中枢电力/设备规格 stat 族（显示为主；当前功率修正=parts 链+minValue=1 钳制）
+        public static StatDef Celes_ProducerPowerAdjust;
+        public static StatDef Celes_ProducerThreadOutput;
+        public static StatDef Celes_DeviceBoost;
+        public static StatDef Celes_DeviceThreadCost;
+        public static StatDef Celes_DeviceProducerLoad;
+        public static StatDef Celes_DeviceConnCount;
+        public static StatDef Celes_DeviceConnRange;
     }
 }

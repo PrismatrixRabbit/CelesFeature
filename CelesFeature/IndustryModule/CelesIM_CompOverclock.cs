@@ -8,8 +8,8 @@ namespace CelesFeature
     // ════════════════════════════════════════════════════════════════
     // 批 6 C：超频（2026-10-03 · D37/D42 终版）——挂终端 def（Celes_TestAutoProducer）
     // 「连接时终端获得 Toggle」：解锁唯一条件=Buff 链接（终端 AffectedByFacilities 链接含
-    // 携 unlockOverclock 的超频器且其 CanBeActive）；科技只 gate 超频器建造（def
-    // researchPrerequisites，D42-①）——建了并链接即可超频。
+    // 携 unlockOverclock 的超频器且其 CanBeActive）——建了并链接即可超频
+    //（建造门已由 D57 移除——原超频科技随批清理；D57 起本 comp 的 Active 亦为配方解锁门）。
     // 修正两点（电力×3.5 已移除 D42-③）全部作用于终端=连接对象，超频器自身零修正（D37）：
     //   效率：CelesIM_StatPart_Overclock 挂 Celes_ThreadLinkEfficiency parts（XML li）——显示免费
     //   线程：Consumer.ThreadCost 属性单点 ×threadCostFactor（D42-④ 方案1 乘数；消费面 7 点实证）

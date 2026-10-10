@@ -444,7 +444,12 @@ namespace CelesFeature
             var comp = ce.parent.TryGetComp<Celes_CompMultiVerb>();
             if (comp == null)
                 return;
-            if (verb != __instance.AllVerbs[comp.verbIndex])
+            // [修复 2026-10-11] 与 Prefix 同口径越界守卫（原为直索引；verb 初始化异常时 AllVerbs 短于预期会越界）
+            List<Verb> allVerbs = __instance.AllVerbs;
+            int idx = comp.verbIndex;
+            if (idx < 0 || idx >= allVerbs.Count)
+                return;
+            if (verb != allVerbs[idx])
             {
                 __result = new Command_VerbTargetInvisible
                 {

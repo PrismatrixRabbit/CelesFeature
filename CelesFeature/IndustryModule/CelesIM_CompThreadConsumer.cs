@@ -28,7 +28,7 @@ namespace CelesFeature
                 warmUpDecayPerTick = 0.5f;
             }
         }
-        public string overclockTech = "";
+        // D42 决议·D57 批执行：overclockTech 死字段删除（零消费者——建造门移除后的最后残留）
         // ── 批 3 B3：连接状态标志（markTexPath 空 = 不启用；无绑定不显示；绑定+活跃=蓝/链不通=红）──
         public string markTexPath = "";                              // 标志贴图路径（XML 可配，不写死）
         public float linkHeight = 0f;                                // 标志 z+ 偏移（伪 3D 视觉高度）

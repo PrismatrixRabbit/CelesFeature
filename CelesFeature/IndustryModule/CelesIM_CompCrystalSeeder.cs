@@ -37,6 +37,7 @@ namespace CelesFeature
 
         [Unsaved] private CompRefuelable refuelable;
         [Unsaved] private CelesIM_CompThreadConsumer threadComp;
+        [Unsaved] private CompPowerTrader powerComp;
 
         public CelesIM_CompProperties_CrystalGrowth Props => (CelesIM_CompProperties_CrystalGrowth)props;
 
@@ -45,6 +46,7 @@ namespace CelesFeature
             base.PostSpawnSetup(respawningAfterLoad);
             refuelable = parent.GetComp<CompRefuelable>();
             threadComp = parent.GetComp<CelesIM_CompThreadConsumer>();
+            powerComp = parent.GetComp<CompPowerTrader>();
             if (!respawningAfterLoad)
             {
                 nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
@@ -53,19 +55,31 @@ namespace CelesFeature
 
         // [事实] 必须用 CompTick：培育器 tickerType=Normal（CompRefuelable 持续消耗硬约束，CompProperties_Refuelable.cs:152-155），
         // Normal 型 Thing 仅逐 tick 调 CompTick，不调 CompTickRare——挂 CompTickRare 会导致检测永不执行
-        // 每 tick 仅 int 比较 + 布尔门控，O(1) 成本可忽略
+        // F1 后每 tick 求值三态门控（冻结平移要求停机期间逐 tick 执行；单建筑量级可控，用户裁决 2026-10-16）
         public override void CompTick()
         {
             base.CompTick();
             if (!parent.Spawned)
                 return;
             // [事实] 燃料停机门控 CompRefuelable.HasFuel（CompRefuelable.cs:65-79）
-            // 功耗双档由原版 SetUpPowerVars 处理（CompPowerTrader.cs:245-258：spawn 时按 PowerOn 设 idlePowerDraw/PowerConsumption），
+            // [事实] 功耗双档由原版 SetUpPowerVars 处理（CompPowerTrader.cs:245-258：spawn 时按 PowerOn 设 idlePowerDraw/PowerConsumption），
             // 勿手动覆盖 PowerOutput——曾致电网负载突增 → PowerNet 随机关闭（PowerNet.cs:249-271）
             bool hasFuel = refuelable == null || refuelable.HasFuel;
             // 带宽门控：断连/中枢离线冻结生长（不生长不新建），带宽组件为可选挂载
             bool threadOk = threadComp == null || (threadComp.IsConnected && !threadComp.IsStandby);
-            if (Find.TickManager.TicksGame < nextGrowTick || !hasFuel || !threadOk)
+            // F1 断电门控：断电时 consumeFuelOnlyWhenPowered 不耗料→HasFuel 常 true，原链路漏判致断电仍生长——
+            // [事实] 原版耗料同构判定（CompRefuelable.cs:225：consumeFuelOnlyWhenPowered 时 comp.PowerOn 才 ConsumeFuel）；
+            // 无电 comp 视为不依赖电（与 refuelable/threadComp 可选挂载放行惯例同构）；flick 关闭→PowerOn=false 已覆盖
+            bool powerOk = powerComp == null || powerComp.PowerOn;
+            if (!hasFuel || !threadOk || !powerOk)
+            {
+                // F1 停机冻结：nextGrowTick 逐 tick 平移 → "剩余倒计时"恒定在断开瞬间的值，恢复后走完剩余再检测；
+                // dev 快进（DebugSetTicksGame 跳变无 CompTick）不平移 → 恢复即检一次（等价旧档过期值语义）
+                if (Find.TickManager.TicksGame < nextGrowTick)
+                    nextGrowTick++;
+                return;
+            }
+            if (Find.TickManager.TicksGame < nextGrowTick)
                 return;
             nextGrowTick = Find.TickManager.TicksGame + Props.ticksToGrow;
             CelesIM_CrystalGrowthUtility.DoGrowCheck(parent.Map, parent.Position, Props,
@@ -122,18 +136,15 @@ namespace CelesFeature
             }
         }
 
+        // 自动标记状态由 gizmo 开关形态表达（用户裁决 2026-10-16：inspect 行与 gizmo 信息重复，删除）；DEV 倒计时保留
         public override string CompInspectStringExtra()
         {
-            string text = "CelesIM_Keyed_AutoMarkStatus".Translate(
-                autoMarkHarvest ? "CelesIM_Keyed_On".Translate() : "CelesIM_Keyed_Off".Translate());
-            if (Prefs.DevMode)
-            {
-                int remain = nextGrowTick - Find.TickManager.TicksGame;
-                text += remain > 0
-                    ? "\nDEV: 距下次检测 " + remain.ToStringTicksToPeriod()
-                    : "\nDEV: 检测待执行";
-            }
-            return text;
+            if (!Prefs.DevMode)
+                return null;
+            int remain = nextGrowTick - Find.TickManager.TicksGame;
+            return remain > 0
+                ? "DEV: 距下次检测 " + remain.ToStringTicksToPeriod()
+                : "DEV: 检测待执行";
         }
 
         public override void PostExposeData()

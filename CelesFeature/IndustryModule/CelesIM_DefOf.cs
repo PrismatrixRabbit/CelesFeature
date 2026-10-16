@@ -23,8 +23,7 @@ namespace CelesFeature
         // 计算与显示唯一源；default 0=无预热）
         public static StatDef Celes_WarmUpDuration;
 
-        // 批 5 视觉修订批：锻造流光 mote（单南向起步——建筑 Graphic_Single 不旋转；转 Multi 时补 east/west/north 同族+per-rotation 字典）
-        public static ThingDef Celes_Mote_ForgeGlow_South;
+        // 批 5 视觉修订批：锻造流光 mote —— 2026-10-16 起改为每建筑经 CelesIM_CompProperties_ForgeGlow 直配（DefOf 项移除）
 
         // 批 6 D36：星铃 race（Race_Celes.xml——星铃调频乘数的操作者判定）
         public static ThingDef Celes_Race;

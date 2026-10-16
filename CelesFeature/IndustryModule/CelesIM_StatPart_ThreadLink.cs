@@ -88,11 +88,11 @@ namespace CelesFeature
     // · 乘法链：BillTick WorkSpeedMultiplier → GetStatValue(WorkTableWorkSpeedFactor) →
     //   P1 postfix → GetWorkSpeedFactor → GetStatValue(Celes_ThreadLinkEfficiency) → 本 part ×1.2
     //   → 周期 ETA（AppendForgeCycles）/终端 Inspect 尘构机效率行/InfoCard 分解行全链自动跟随
-    // · 判定源=CelesIM_CompStarlinkTuning（收尾修正 10-03 解耦：原直判建筑类型，comp 化后
+    // · 判定源=CelesIM_CompCelestiaSync（收尾修正 10-03 解耦：原直判建筑类型，comp 化后
     //   双形态可挂任意建筑——A=自动生产机 bill 旗标 / B=常规工作台操作者判定，见该文件头）
     // · 注入：XML parts li（Stats_Building.xml Celes_ThreadLinkEfficiency，与 ThreadProgress 同位）
     // ════════════════════════════════════════════════════════════════
-    public class CelesIM_StatPart_StarlinkTuning : StatPart
+    public class CelesIM_StatPart_CelestiaSync : StatPart
     {
         public override void TransformValue(StatRequest req, ref float val)
         {
@@ -100,7 +100,7 @@ namespace CelesFeature
             {
                 return;
             }
-            val *= CelesIM_Bill_AutoProducer.StarlinkTuningFactor;
+            val *= CelesIM_Bill_AutoProducer.CelestiaSyncFactor;
         }
 
         public override string ExplanationPart(StatRequest req)
@@ -109,8 +109,8 @@ namespace CelesFeature
             {
                 return null;   // 未调频不占分解行（原版 StatPart 仅在生效时显示，与 ThreadLink 同构）
             }
-            return "CelesIM_Keyed_StarlinkTuning".Translate(
-                CelesIM_Bill_AutoProducer.StarlinkTuningFactor.ToStringPercent());
+            return "CelesIM_Keyed_CelestiaSync".Translate(
+                CelesIM_Bill_AutoProducer.CelestiaSyncFactor.ToStringPercent());
         }
 
         private static bool Tuned(StatRequest req)
@@ -119,7 +119,7 @@ namespace CelesFeature
             {
                 return false;
             }
-            CelesIM_CompStarlinkTuning tuning = req.Thing.TryGetComp<CelesIM_CompStarlinkTuning>();
+            CelesIM_CompCelestiaSync tuning = req.Thing.TryGetComp<CelesIM_CompCelestiaSync>();
             return tuning != null && tuning.TuningActive;
         }
     }

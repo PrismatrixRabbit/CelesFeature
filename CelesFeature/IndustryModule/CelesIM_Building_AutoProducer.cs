@@ -30,12 +30,14 @@ namespace CelesFeature
         [Unsaved] private CelesIM_CompThreadConsumer threadComp;
         [Unsaved] private Sustainer workingSound;         // Forming 周期环境音（母本 :14 同位）
         [Unsaved] private Mote workingMote;               // 锻造流光（裂解扫描仪附着式 mote，Mote_Visual 基类同款）
+        [Unsaved] private CelesIM_CompForgeGlow glowComp;   // 流光 mote 来源（XML 经 comp 直配，2026-10-16）
 
         public override void SpawnSetup(Map map, bool respawningAfterLoad)
         {
             base.SpawnSetup(map, respawningAfterLoad);
             powerComp = GetComp<CompPowerTrader>();
             threadComp = GetComp<CelesIM_CompThreadConsumer>();
+            glowComp = GetComp<CelesIM_CompForgeGlow>();
         }
 
         public override bool CanWork()
@@ -147,8 +149,9 @@ namespace CelesFeature
                 // needsMaintenance 生命周期——门控转 false 即断维持，fadeOutUnmaintained 自动淡出=冻结淡出）
                 if (workingMote == null || workingMote.Destroyed)
                 {
-                    if (CelesIM_DefOf.Celes_Mote_ForgeGlow_South != null)
-                        workingMote = MoteMaker.MakeAttachedOverlay(this, CelesIM_DefOf.Celes_Mote_ForgeGlow_South, Vector3.zero);
+                    ThingDef glowDef = glowComp?.Props.glowMoteDef;
+                    if (glowDef != null)
+                        workingMote = MoteMaker.MakeAttachedOverlay(this, glowDef, glowComp.Props.offset, glowComp.Props.scale);
                 }
                 workingMote?.Maintain();
             }

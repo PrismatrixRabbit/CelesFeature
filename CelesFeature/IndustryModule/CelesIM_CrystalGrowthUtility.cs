@@ -78,8 +78,14 @@ namespace CelesFeature
             if (cell.GetThingList(map).Count > 0)
                 return null;
             // 晶簇位置创建感染地板（layerable 铺层——可逆拆除还原原始地形；不触发地板破坏——protectedTerrains 豁免）
+            // F2：当前地板已属可生长表面（terrainToGrow，两模式通用）则跳过铺设——保住玩家的人工晶态表面投资；
+            // 野化源在自然地形（∉白名单）上仍铺感染表面（有意表现）；白名单 null（理论配置）保持现行铺设
             if (props.spawnTerrain != null)
-                map.terrainGrid.SetTerrain(cell, props.spawnTerrain);
+            {
+                TerrainDef current = map.terrainGrid.TerrainAt(cell);
+                if (props.terrainToGrow == null || !props.terrainToGrow.Contains(current))
+                    map.terrainGrid.SetTerrain(cell, props.spawnTerrain);
+            }
             CelesIM_CrystalCluster cluster = (CelesIM_CrystalCluster)ThingMaker.MakeThing(props.baseGrowDef);
             cluster.InitGrowth(new List<int>(props.pointToGrow),
                 props.terrainToGrow != null ? new List<TerrainDef>(props.terrainToGrow) : null,

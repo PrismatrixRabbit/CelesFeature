@@ -225,7 +225,8 @@
         <Compile Include="IndustryModule\CelesIM_CompFacility_Amplifier.cs" />
         <Compile Include="IndustryModule\CelesIM_CompOverclock.cs" />
         <Compile Include="IndustryModule\CelesIM_RecipeWorker_Locked.cs" />
-        <Compile Include="IndustryModule\CelesIM_CompStarlinkTuning.cs" />
+        <Compile Include="IndustryModule\CelesIM_CompCelestiaSync.cs" />
+        <Compile Include="IndustryModule\CelesIM_CompForgeGlow.cs" />
         <Compile Include="IndustryModule\CelesIM_CompFacility_ProducerDevice.cs" />
         <Compile Include="IndustryModule\CelesIM_CompProducerPower.cs" />
         <Compile Include="IndustryModule\CelesIM_StatPart_ProducerPower.cs" />

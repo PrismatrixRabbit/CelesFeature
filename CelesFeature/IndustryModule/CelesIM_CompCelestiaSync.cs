@@ -6,7 +6,7 @@ namespace CelesFeature
 {
     // ════════════════════════════════════════════════════════════════
     //  批 6 收尾修正：星铃调频 comp（双形态 · 用户裁决 2026-10-03）
-    //  · 「是否受星铃调频」的 XML 挂载点——StatPart_StarlinkTuning 经本 comp 判定
+    //  · 「是否受星铃调频」的 XML 挂载点——StatPart_CelestiaSync 经本 comp 判定
     //    （原直判建筑类型=解耦前形态；现在任意建筑挂 comp 即可参与调频）
     //  · 形态 A（AutoBill，默认）：挂自动生产机——触发源=bill 旗标（D36 原语义零变化：
     //    Bill_AutoProducer.Notify_DoBillStarted 判 billDoer race 置位 / Reset 清除，
@@ -20,52 +20,52 @@ namespace CelesFeature
     //    「正在该台工作」语义（用户裁决 10-03）。查询驱动+60t 节流缓存（≤1s 滞后），
     //    刻意不用 CompTick：工作台 def tickerType 多为 Never，comp tick 不可靠
     // ════════════════════════════════════════════════════════════════
-    public enum CelesIM_StarlinkMode
+    public enum CelesIM_CelestiaSyncMode
     {
         AutoBill,        // 形态 A：bill 旗标（自动生产机）
         OperatorAtWork   // 形态 B：操作者正在本台工作（常规工作台）
     }
 
-    public class CelesIM_CompProperties_StarlinkTuning : CompProperties
+    public class CelesIM_CompProperties_CelestiaSync : CompProperties
     {
-        public CelesIM_StarlinkMode mode = CelesIM_StarlinkMode.AutoBill;
+        public CelesIM_CelestiaSyncMode mode = CelesIM_CelestiaSyncMode.AutoBill;
 
-        public CelesIM_CompProperties_StarlinkTuning()
+        public CelesIM_CompProperties_CelestiaSync()
         {
-            compClass = typeof(CelesIM_CompStarlinkTuning);
+            compClass = typeof(CelesIM_CompCelestiaSync);
         }
     }
 
-    public class CelesIM_CompStarlinkTuning : ThingComp
+    public class CelesIM_CompCelestiaSync : ThingComp
     {
-        public CelesIM_CompProperties_StarlinkTuning Props => (CelesIM_CompProperties_StarlinkTuning)props;
+        public CelesIM_CompProperties_CelestiaSync Props => (CelesIM_CompProperties_CelestiaSync)props;
 
         // 形态 B 瞬态缓存（可推导不存档）；cachedTick 负初值=首查必扫
         private int cachedTick = -99999;
         private bool cachedValue;
 
-        // StatPart_StarlinkTuning 唯一消费方（尘构机效率 parts 链）
+        // StatPart_CelestiaSync 唯一消费方（尘构机效率 parts 链）
         public bool TuningActive
         {
             get
             {
-                if (Props.mode == CelesIM_StarlinkMode.AutoBill)
+                if (Props.mode == CelesIM_CelestiaSyncMode.AutoBill)
                 {
                     return parent is CelesIM_Building_AutoProducer producer
                         && producer.ActiveBill is CelesIM_Bill_AutoProducer bill
-                        && bill.StarlinkTuningActive;
+                        && bill.CelestiaSyncActive;
                 }
                 if (Find.TickManager.TicksGame - cachedTick < 60)
                 {
                     return cachedValue;
                 }
                 cachedTick = Find.TickManager.TicksGame;
-                cachedValue = ScanOperatorStarlink();
+                cachedValue = ScanOperatorCelestiaSync();
                 return cachedValue;
             }
         }
 
-        private bool ScanOperatorStarlink()
+        private bool ScanOperatorCelestiaSync()
         {
             Map map = parent.Map;
             if (map == null || !(parent is Building building) || !building.def.hasInteractionCell)

@@ -45,12 +45,24 @@ namespace CelesFeature
             return levelGraphicCache[index];
         }
 
-        // 问题 1：Inspect 显示等级
+        // F5：显示总生长值＋预期产出（用户裁决 2026-10-16：不显示等级——等级仅内部参与产出取值）
         public override string CompInspectStringExtra()
         {
             string text = base.CompInspectStringExtra();
-            string s = "CelesIM_Keyed_CrystalLevel".Translate((parent as CelesIM_CrystalCluster)?.Level ?? 0);
+            CelesIM_CrystalCluster cluster = parent as CelesIM_CrystalCluster;
+            string s = "CelesIM_Keyed_CrystalLevel".Translate(
+                cluster?.GrowthPoints ?? 0,
+                YieldFor(cluster?.Level ?? 0),
+                parent.def.building?.mineableThing?.label ?? "");
             return text.NullOrEmpty() ? s : text + "\n" + s;
+        }
+
+        // 各等级开采产出（与 PostDestroy 掉落同源：yieldByLevel[level-1]，越界 0）
+        private int YieldFor(int level)
+        {
+            if (Props.yieldByLevel == null || level < 1 || level > Props.yieldByLevel.Count)
+                return 0;
+            return Props.yieldByLevel[level - 1];
         }
 
         // 问题 2：等级产出——[事实] 覆写链实证：DestroyMined(非virtual) → base.Destroy → ThingWithComps.Destroy 无条件回调
@@ -105,6 +117,9 @@ namespace CelesFeature
         public int Level => level;
 
         public int MaxLevel => pointThresholds?.Count ?? 1;
+
+        // F5：累计生长值只读暴露（comp inspect 显示用；满级后继续累加为原行为，直显无分母不穿帮）
+        public int GrowthPoints => growthPoints;
 
         // [事实] dev 直接生成时未走 InitGrowth → 参数 null → 地板摧毁失效（K1 根因）
         // 兜底：从 Def 的 Comp 默认参数初始化；培育器/晶种生成时 InitGrowth 覆盖

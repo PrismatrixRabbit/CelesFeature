@@ -44,7 +44,7 @@ namespace CelesFeature
 				GetNextExplosionCell();
 			}
 		}
-
+  
 		protected override void Tick()
 		{
 			if (base.Destroyed)
